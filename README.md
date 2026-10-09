@@ -65,4 +65,3 @@ This is a Version 1 foundation. It intentionally uses a simple booking rule:
 - there is no payment
 - there is no temporary 5-minute hold
 
-Before submission, add stronger production-style validation, better UI, tests, and documentation.
