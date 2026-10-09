@@ -1,0 +1,39 @@
+services:
+  mongodb:
+    image: mongo:8
+    container_name: cinema-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  backend:
+    build: ./backend
+    container_name: cinema-backend
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      MONGO_URI: mongodb://mongodb:27017
+      DB_NAME: cinema_booking
+      JWT_SECRET: change_this_to_a_long_random_secret
+      CLIENT_ORIGIN: http://172.18.54.141:5173
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongodb
+
+  frontend:
+    build: ./frontend
+    container_name: cinema-frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://172.18.54.141:3000/api
+      VITE_WS_URL: ws://172.18.54.141:3000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
