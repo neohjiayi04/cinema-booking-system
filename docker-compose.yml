@@ -17,7 +17,7 @@ services:
       MONGO_URI: mongodb://mongodb:27017
       DB_NAME: cinema_booking
       JWT_SECRET: change_this_to_a_long_random_secret
-      CLIENT_ORIGIN: http://172.18.54.141:5173
+      CLIENT_ORIGIN: http://localhost:5173
     ports:
       - "3000:3000"
     depends_on:
@@ -28,8 +28,8 @@ services:
     container_name: cinema-frontend
     restart: unless-stopped
     environment:
-      VITE_API_URL: http://172.18.54.141:3000/api
-      VITE_WS_URL: ws://172.18.54.141:3000
+      VITE_API_URL: http://localhost:3000/api
+      VITE_WS_URL: ws://localhost:3000
     ports:
       - "5173:5173"
     depends_on:
