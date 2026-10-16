@@ -1,0 +1,620 @@
+/* Import Google Fonts for Playfair Display & Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;0,800;1,600&display=swap');
+
+:root {
+  --bg-canvas: #fbfbfa;
+  --bg-surface: #ffffff;
+  --text-primary: #090a0f;
+  --text-muted: #64748b;
+  --navy-deep: #0f172a;
+  --navy-accent: #1e3a8a;
+  --accent-gold: #d97706;
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --shadow-elevation: 0 20px 40px -15px rgba(15, 23, 42, 0.07);
+  
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.home-container {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 5rem 1.5rem;
+  background-color: var(--bg-canvas);
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (min-width: 768px) {
+  .home-container {
+    padding: 3.5rem 2.5rem 7rem 2.5rem;
+  }
+}
+
+/* ==========================================
+   CINEMATIC HERO SECTION
+   ========================================== */
+.hero {
+  position: relative;
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #09142e 20%, #083378 100%);
+  color: #ffffff;
+/* Reduced vertical padding from 3.5rem to 2rem on mobile, and 5.5rem to 3rem on desktop */
+  padding: 2rem 1.5rem;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+  margin-bottom: 5rem;
+  overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .hero {
+    padding: 3rem 4.5rem;
+  }
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  right: -10%;
+  width: 550px;
+  height: 550px;
+  background: radial-gradient(circle, rgba(30, 58, 138, 0.45) 0%, rgba(217, 119, 6, 0.15) 50%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(70px);
+}
+
+.hero-grid {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 3rem;
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .hero-grid {
+    grid-template-columns: 1.25fr 0.75fr;
+  }
+}
+
+.hero-content .eyebrow {
+  display: inline-block;
+  font-family: var(--font-sans);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: #9bbcff;
+  border-radius: 9999px;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+}
+
+.hero-content h1 {
+  font-family: var(--font-serif);
+  font-size: 2.35rem;
+  font-weight: 700;
+  line-height: 1.12;
+  color: #ffffff;
+  margin: 0 0 1.5rem 0;
+  letter-spacing: -0.02em;
+}
+
+@media (min-width: 768px) {
+  .hero-content h1 {
+    font-size: 4rem;
+  }
+}
+
+.hero-content h1 em {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 600;
+  background: linear-gradient(to right, #fbbf24, #f59e0b);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero-content p {
+  font-family: var(--font-sans);
+  font-size: 1.1rem;
+  color: #94a3b8;
+  line-height: 1.7;
+  max-width: 38rem;
+  margin-bottom: 1rem;
+}
+
+.hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #cbd5e1;
+}
+
+.hero-meta span {
+  background: rgba(242, 253, 147, 0.137);
+  backdrop-filter: blur(80px);
+  border: 1px solid rgba(242, 253, 147, 0.337);
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.5rem;
+}
+
+/* Luxury Primary Button */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: linear-gradient(135deg, #f3eff6 10%, #faf9df 100%);
+  color: #0f172a !important;
+  font-family: var(--font-sans);
+  font-weight: 700;
+  padding: 1rem 2rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 10px 25px -5px rgba(255, 255, 255, 0.2);
+  text-decoration: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: none;
+  cursor: pointer;
+  min-height: 50px;
+}
+
+.btn-primary:hover {
+  background: #fbbf24;
+  transform: translateY(-2px);
+  box-shadow: 0 15px 30px -5px rgba(251, 191, 36, 0.3);
+}
+
+/* Glassmorphism Featured Poster Graphic */
+.hero-poster-wrapper {
+  perspective: 1000px; /* Establishes the 3D space for child elements */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+}
+
+.featured-poster-card {
+  width: 100%;
+  max-width: 280px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 1rem;
+  border-radius: 1.25rem;
+  
+  /* Deep 3D Shadow mimicking physical elevation */
+  box-shadow: 
+    0 30px 60px -12px rgba(0, 0, 0, 0.5),
+    0 18px 36px -18px rgba(30, 58, 138, 0.4),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.2); /* Inner top highlight for glossy 3D edge */
+
+  /* Initial 3D rotation angle */
+  transform: rotateX(6deg) rotateY(-12deg) rotateZ(2deg);
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.5s ease;
+}
+
+/* Glossy light reflection sweep across the 3D surface */
+.featured-poster-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 1.25rem;
+  background: linear-gradient(
+    135deg, 
+    rgba(255, 255, 255, 0.25) 0%, 
+    rgba(255, 255, 255, 0.03) 50%, 
+    transparent 50%
+  );
+  pointer-events: none;
+}
+
+/* Hover state: Card springs up toward the viewer */
+.featured-poster-card:hover {
+  transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg) scale(1.05) translateZ(30px);
+  box-shadow: 
+    0 40px 80px -15px rgba(0, 0, 0, 0.6),
+    0 25px 50px -20px rgba(251, 191, 36, 0.3),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.4);
+}
+
+.featured-poster-img {
+  aspect-ratio: 2/3;
+  width: 100%;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: #0f172a;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3); /* Gives depth to the image container itself */
+}
+
+.featured-poster-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.7s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.featured-poster-card:hover .featured-poster-img img {
+  transform: scale(1.08);
+}
+
+.placeholder-poster {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(to bottom, #1e293b, #0f172a);
+  padding: 1.5rem;
+  text-align: center;
+  color: #ffffff;
+}
+
+.placeholder-poster h3 {
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0.5rem 0;
+  color: #f8fafc;
+}
+
+.placeholder-poster p {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+
+/* ==========================================
+  SEARCH/FILTER BAR
+   ========================================== */
+/* Header alignment */
+.catalog-header {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+@media (min-width: 640px) {
+  .catalog-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+}
+
+.catalog-header h2 {
+  font-family: var(--font-serif);
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0.35rem 0;
+  letter-spacing: -0.02em;
+}
+
+.catalog-header p {
+  color: var(--text-muted);
+  font-size: 1.0rem;
+  margin: 0;
+}
+
+.film-count-badge {
+  background-color: #e0e7ff;
+  color: var(--navy-accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.6rem 1.1rem;
+  border-radius: 0.5rem;
+  letter-spacing: 0.05em;
+  width: fit-content;
+}
+
+/* SEARCH & FILTER TOOLBAR */
+.filter-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  background: #ffffff00; /* Transparent background for a clean look */
+  margin-bottom: 2.5rem;
+  transition: all 0.25s ease;
+}
+
+@media (min-width: 768px) {
+  .filter-container {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+  }
+}
+
+/* Search Box Integration */
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 400px;
+}
+
+/* Search Icon Styling */
+.search-icon {
+  position: absolute;
+  left: 0.85rem;
+  font-size: 0.95rem;
+  color: #94a3b8;
+  pointer-events: none;
+  transition: color 0.2s;
+}
+
+/* Search Input Box */
+.search-box input {
+  width: 100%;
+  padding: 0.65rem 2.25rem 0.65rem 2.5rem;
+  background: #f8fafc;
+  border: 1px solid #a8acb2;
+  border-radius: 0.75rem;
+  font-family: var(--font-sans, 'Inter', sans-serif);
+  font-size: 0.9rem;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.2s ease;
+  min-height: 42px;
+}
+
+.search-box input::placeholder {
+  color: #94a3b8;
+}
+
+.search-box input:focus {
+  background: #ffffff;
+  border-color: #1e3a8a;
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+}
+
+.search-box input:focus ~ .search-icon {
+  color: #1e3a8a;
+}
+
+/* Clear Button Inside Input */
+.clear-search-btn {
+  position: absolute;
+  right: 0.75rem;
+  background: #d5ebfd;
+  border: none;
+  color: #002f72;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.35rem;
+}
+
+.clear-search-btn:hover {
+  background: #cbd5e1;
+  color: #0f172a;
+}
+
+/* Horizontal Genre Filter Chips */
+.genre-chips {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  scrollbar-width: none; /* Hide scrollbar on desktop */
+  padding: 0.1rem 0;
+}
+
+.genre-chips::-webkit-scrollbar {
+  display: none;
+}
+
+/* Individual Pill Buttons */
+.genre-chip {
+  font-family: var(--font-sans, 'Inter', sans-serif);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.5rem 1.1rem;
+  border-radius: 9999px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.genre-chip:hover {
+  border-color: #cbd5e1;
+  color: #031b52;
+  background: #f8fafc;
+  transform: translateY(-1px);
+}
+
+/* Active Genre State (Navy Accent) */
+.genre-chip.active {
+  background: #021748;
+  color: #ffffff;
+  border-color: #0f172a;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
+}
+
+/* States */
+.state-container {
+  padding: 4rem 2rem;
+  text-align: center;
+  background: var(--bg-surface);
+  border-radius: 1.25rem;
+  border: 1px dashed #cbd5e1;
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  margin: 2.5rem 0;
+  box-shadow: var(--shadow-elevation);
+}
+
+.error-state {
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+
+.error {
+  color: #991b1b;
+  font-weight: 600;
+  margin: 0 0 1.25rem 0;
+}
+
+.btn-secondary {
+  margin-top: 0.75rem;
+  background-color: var(--navy-deep);
+  color: #ffffff;
+  border: none;
+  padding: 0.85rem 1.75rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  min-height: 46px;
+}
+
+.btn-secondary:hover {
+  background-color: var(--navy-accent);
+}
+
+/* Movie Grid */
+.movie-grid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr);
+  gap: 2.25rem;
+}
+
+@media (min-width: 640px) {
+  .movie-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 768px) {
+  .movie-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .movie-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2.5rem;
+  }
+}
+
+
+/* ==========================================
+   CINEMATIC MOVIE CARDS
+   ========================================== */
+.movie-card {
+  background: var(--bg-surface, #ffffff);
+  border-radius: 1rem;
+  border: 1px solid var(--border-subtle, rgba(15, 23, 42, 0.08));
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.movie-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -6px rgba(30, 58, 138, 0.12);
+}
+
+.movie-card img {
+  aspect-ratio: 3 / 4; /* Makes the poster image shorter */
+  width: 100%;
+  object-fit: cover;
+  background-color: #f1f5f9;
+  transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.movie-card:hover img {
+  transform: scale(1.04);
+}
+
+.card-body {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.movie-card .badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--navy-accent, #1e40af);
+  background-color: #e0e7ff;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.35rem;
+  width: fit-content;
+  margin-bottom: 0.5rem;
+}
+
+.movie-card h3 {
+  font-family: var(--font-serif, 'Playfair Display', serif);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+  margin: 0 0 0.25rem 0;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.movie-card p {
+  font-size: 0.825rem;
+  color: var(--text-muted, #64748b);
+  margin: 0 0 0.85rem 0; 
+  font-weight: 500;
+}
+
+.movie-card .button {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  background-color: #f8fafc;
+  color: var(--navy-deep, #0f172a);
+  border: 1px solid #cbd5e1;
+  padding: 0.5rem 0.85rem; 
+  border-radius: 0.5rem;
+  font-size: 0.825rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  min-height: 38px;
+}
+
+.movie-card .button:hover {
+  background-color: var(--navy-deep, #0f172a);
+  color: #ffffff;
+  border-color: var(--navy-deep, #0f172a);
+}
