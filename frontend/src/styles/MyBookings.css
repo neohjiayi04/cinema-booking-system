@@ -1,0 +1,332 @@
+:root {
+  --bg-color: #f4f7fe;
+  --card-bg: #ffffff;
+  --text-main: #1b2559;
+  --text-muted: #707eae;
+  --brand-blue: #4318ff;
+  --brand-blue-hover: #3311db;
+  --badge-bg: #eef2ff;
+  --border-color: #e0e5f2;
+  --accent-amber: #b45309;
+  --amber-bg: #fef3c7;
+}
+
+/* Outer Wrapper Centering */
+.bookings-page-wrapper {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.bookings-page-container {
+  width: 100%;
+  max-width: 1050px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Header Section Styling */
+.bookings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 8px;
+}
+
+.eyebrow {
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 2px;
+  color: var(--brand-blue);
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.bookings-header h1 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  margin: 0 0 6px 0;
+  color: var(--text-main);
+  font-family: var(--font-serif);
+}
+
+.sub-description {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.filter-pill {
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 4px 12px rgba(112, 126, 174, 0.05);
+}
+
+.pill-count {
+  background: var(--badge-bg);
+  color: var(--brand-blue);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+}
+
+/* Scrollable / Stacked Booking List */
+.booking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Ticket Card Layout (3-Column Split like image) */
+.ticket-card {
+  background: #ffffff;
+  border-radius: 24px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 10px 30px rgba(112, 126, 174, 0.06);
+  display: grid;
+  grid-template-columns: 140px 1fr 240px;
+  overflow: hidden;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ticket-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 15px 35px rgba(67, 24, 255, 0.08);
+}
+
+/* 1. Poster Column */
+.ticket-poster-container {
+  width: 100%;
+  height: 100%;
+  background: #eef2ff;
+}
+
+.ticket-poster {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 2. Middle Details Column */
+.ticket-details {
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.ticket-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.confirmed-pill {
+  background: #e6fcf5;
+  color: #0ca678;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  background-color: #0ca678;
+  border-radius: 50%;
+}
+
+.ref-number {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.movie-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0 0 4px 0;
+  color: var(--text-main);
+}
+
+.movie-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0 0 20px 0;
+}
+
+/* Highlight Grid Box */
+.ticket-info-grid {
+  background: #f8fafc;
+  border: 1px solid #edf2f7;
+  border-radius: 16px;
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat( auto-fit, minmax(100px, 1fr) );
+  gap: 16px;
+}
+
+.info-label {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.info-val {
+  font-size: 0.95rem;
+  color: var(--text-main);
+  font-weight: 700;
+}
+
+.price {
+  color: var(--brand-blue);
+}
+
+.edit-seats-input {
+  width: 90%;
+  padding: 4px 8px;
+  border: 1px solid var(--brand-blue);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+/* 3. Right Side Digital Pass Section */
+.ticket-pass-section {
+  background: #f8faff;
+  border-left: 2px dashed var(--border-color);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.qr-box {
+  background: #ffffff;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+  margin-bottom: 8px;
+}
+
+.qr-image {
+  width: 90px;
+  height: 90px;
+  display: block;
+}
+
+.pass-caption {
+  font-size: 0.65rem;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+
+/* Action Buttons */
+.ticket-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn-modify, .btn-delete, .btn-save, .btn-cancel-edit {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-modify {
+  background-color: var(--amber-bg);
+  color: var(--accent-amber);
+}
+
+.btn-modify:hover {
+  background-color: #fde68a;
+}
+
+.btn-delete {
+  background-color: #ffffff;
+  color: #ef4444;
+  border: 1px solid #fee2e2;
+}
+
+.btn-delete:hover {
+  background-color: #fef2f2;
+}
+
+.edit-btn-group {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+}
+
+.btn-save {
+  background-color: var(--brand-blue);
+  color: #ffffff;
+}
+
+.btn-save:hover {
+  background-color: var(--brand-blue-hover);
+}
+
+.btn-cancel-edit {
+  background-color: #e0e5f2;
+  color: var(--text-muted);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Responsive adjustments for mobile/tablets */
+@media (max-width: 850px) {
+  .ticket-card {
+    grid-template-columns: 1fr;
+  }
+
+  .ticket-poster-container {
+    height: 180px;
+  }
+
+  .ticket-pass-section {
+    border-left: none;
+    border-top: 2px dashed var(--border-color);
+  }
+}
