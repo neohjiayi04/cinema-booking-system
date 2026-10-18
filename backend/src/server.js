@@ -89,10 +89,72 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-app.get("/api/auth/me", requireAuth, async (req, res) => {
-  const user = await getUserById(req.user.id);
-  if (!user) return res.status(404).json({ message: "User not found" });
-  res.json({ user: safeUser(user) });
+
+app.put("/api/auth/me", requireAuth, async (req, res) => {
+  try {
+    const name = String(req.body.name || "").trim();
+    const email = String(req.body.email || "").trim().toLowerCase();
+
+    if (!name || name.length > 100) {
+      return res.status(400).json({
+        message: "Name is required and must be 100 characters or fewer."
+      });
+    }
+
+    if (
+      !email ||
+      email.length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+    ) {
+      return res.status(400).json({
+        message: "Please provide a valid email address."
+      });
+    }
+
+    const users = getDb().collection("users");
+    const currentUserId = new ObjectId(req.user.id);
+
+    const existingUser = await users.findOne({
+      email,
+      _id: { $ne: currentUserId }
+    });
+
+    if (existingUser) {
+      return res.status(409).json({
+        message: "This email address is already registered."
+      });
+    }
+
+    const result = await users.updateOne(
+      { _id: currentUserId },
+      {
+        $set: {
+          name,
+          email
+        }
+      }
+    );
+
+    if (!result.matchedCount) {
+      return res.status(404).json({
+        message: "User account not found."
+      });
+    }
+
+    const updatedUser = await users.findOne({
+      _id: currentUserId
+    });
+
+    res.json({
+      message: "Profile updated successfully.",
+      user: safeUser(updatedUser)
+    });
+  } catch (error) {
+    console.error("Profile update failed:", error);
+    res.status(500).json({
+      message: "Unable to update your profile."
+    });
+  }
 });
 
 // ---------------- MOVIES ----------------

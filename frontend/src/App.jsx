@@ -7,6 +7,7 @@ import MovieDetails from "./pages/MovieDetails.jsx";
 import SeatBooking from "./pages/SeatBooking.jsx";
 import BookingConfirmation from "./pages/BookingConfirmation.jsx";
 import MyBookings from "./pages/MyBookings.jsx";
+import UserProfile from "./pages/UserProfile.jsx";
 import AdminDashboard from "./pages/admin/Dashboard.jsx";
 import AdminMovies from "./pages/admin/Movies.jsx";
 import AdminHalls from "./pages/admin/Halls.jsx";
@@ -32,16 +33,33 @@ function Navbar() {
   return (
     <header className="navbar">
       <Link className="brand" to="/">CINEMAX</Link>
-      <nav>
-        <Link to="/">Movies</Link>
-        {user?.role === "customer" && <Link to="/my-bookings">My Bookings</Link>}
-        {user?.role === "admin" && <Link to="/admin">Admin</Link>}
-        {user ? (
-          <button className="link-button" onClick={() => { logout(); navigate("/"); }}>Logout</button>
-        ) : (
-          <Link to="/login">Login</Link>
-        )}
-      </nav>
+        <nav>
+          <Link to="/">Movies</Link>
+          {user?.role === "customer" && (
+            <Link to="/my-bookings">My Bookings</Link>
+          )}
+          {user && (
+            <Link to="/profile">My Profile</Link>
+          )}
+
+          {user?.role === "admin" && (
+            <Link to="/admin">Admin</Link>
+          )}
+
+          {user ? (
+            <button
+              className="link-button"
+              onClick={() => {
+                logout();
+                navigate("/login");
+              }}
+            >
+              Logout
+            </button>
+          ) : (
+            <Link to="/login">Login</Link>
+          )}
+        </nav>
     </header>
   );
 }
@@ -59,6 +77,7 @@ export default function App() {
           <Route path="/booking/:id" element={<RequireAuth><SeatBooking /></RequireAuth>} />
           <Route path="/booking-confirmation/:id" element={<RequireAuth><BookingConfirmation /></RequireAuth>} />
           <Route path="/my-bookings" element={<RequireAuth><MyBookings /></RequireAuth>} />
+          <Route path="/profile" element={<RequireAuth><UserProfile /></RequireAuth>}/>
 
           <Route path="/admin" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
           <Route path="/admin/movies" element={<RequireAdmin><AdminMovies /></RequireAdmin>} />
