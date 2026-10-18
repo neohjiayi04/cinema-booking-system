@@ -21,6 +21,7 @@ export default function Login() {
   }
 
   return (
+  <div className="auth-page-wrapper">
     <section className="auth-card">
       <h1>Welcome Back</h1>
       <p>Sign in to continue booking your movie.</p>
@@ -32,5 +33,6 @@ export default function Login() {
       </form>
       <p>Don't have an account? <Link to="/register">Register</Link></p>
     </section>
+  </div>
   );
 }

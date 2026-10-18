@@ -43,3 +43,284 @@ a { color: inherit; text-decoration: none; }
   width: min(1180px, 90vw); 
   margin: 0 auto; 
   padding: 48px 0 80px; }
+
+.error { color: #b42318; font-weight: 600; }
+@media (max-width: 800px) {
+  .navbar { padding: 0 20px; }
+  .navbar nav { gap: 10px; font-size: 13px; }
+  .container { width: min(94vw, 1180px); padding-top: 25px; }
+  .hero { padding: 35px; min-height: 360px; }
+  .movie-grid, .showtime-grid, .admin-grid { grid-template-columns: 1fr; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .detail-poster { max-width: 280px; }
+  .seat-grid { grid-template-columns: repeat(5, minmax(40px, 1fr)); }
+  .booking-summary { flex-wrap: wrap; }
+  .booking-row, .table-row { grid-template-columns: 1fr; }
+  .admin-form.inline { grid-template-columns: 1fr; }
+}
+
+/*navigation dropdown menu*/
+.nav-dropdown {
+  position: relative;
+}
+
+.nav-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 0;
+  border: 0;
+  color: #c3c7d0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.nav-dropdown-trigger:hover,
+.nav-dropdown-trigger[aria-expanded="true"] {
+  color: var(--accent-gold);
+}
+
+.nav-dropdown-trigger span {
+  font-size: 15px;
+}
+
+.nav-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  min-width: 175px;
+  padding: 7px;
+  border: 1px solid #343741;
+  border-radius: 10px;
+  background: #17191f;
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.35);
+}
+
+.nav-dropdown-menu a,
+.nav-dropdown-menu button {
+  display: block;
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: 6px;
+  color: #d4d6dd;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.nav-dropdown-menu a:hover,
+.nav-dropdown-menu button:hover {
+  color: var(--accent-gold);
+  background: #252831;
+}
+
+@media (max-width: 600px) {
+  .navbar {
+    align-items: center;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .navbar-links {
+    justify-content: flex-start;
+    gap: 8px 16px;
+  }
+
+  .nav-dropdown-menu {
+    right: auto;
+    left: 0;
+  }
+}
+
+/* =========================================================
+   AUTH PAGES — CENTERED & ATTRACTIVE BACKGROUND
+   ========================================================= */
+/* Full-screen centering wrapper for auth pages */
+.auth-page-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+}
+/* Decorative background light blobs for visual appeal */
+.auth-wrapper::before,
+.auth-wrapper::after {
+  content: "";
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  z-index: 0;
+  filter: blur(80px);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.auth-wrapper::before {
+  background: rgba(67, 24, 255, 0.15);
+  top: -100px;
+  left: -100px;
+}
+
+.auth-wrapper::after {
+  background: rgba(106, 210, 255, 0.2);
+  bottom: -100px;
+  right: -100px;
+}
+
+/* Auth Card Container - Sits safely above background elements */
+.auth-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 440px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(20px); /* Modern glassmorphism blur effect */
+  border: 1px solid rgba(224, 229, 242, 0.8);
+  border-radius: 28px;
+  box-shadow: 0 20px 50px rgba(67, 24, 255, 0.08), 
+              0 10px 20px rgba(0, 0, 0, 0.03);
+  padding: 40px;
+  display: center;
+  flex-direction: column;
+  box-sizing: border-box;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.auth-card:hover {
+  box-shadow: 0 25px 60px rgba(67, 24, 255, 0.12), 
+              0 15px 25px rgba(0, 0, 0, 0.04);
+}
+
+/* Typography & Headings */
+.auth-card h1 {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 2.1rem;
+  font-weight: 700;
+  color: #1b2559;
+  margin: 0 0 6px 0;
+}
+
+.auth-card > p {
+  color: #707eae;
+  font-size: 0.9rem;
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+
+/* Form Layout */
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #1b2559;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.auth-card input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 16px;
+  border: 1px solid #e0e5f2;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #1b2559;
+  font-size: 0.95rem;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.auth-card input:focus {
+  border-color: #4318ff;
+  box-shadow: 0 0 0 4px rgba(67, 24, 255, 0.12);
+}
+
+.auth-card input::placeholder {
+  color: #a3aed0;
+}
+
+/* Error Message Box */
+.auth-card .error {
+  background-color: #fef2f2;
+  border: 1px solid #fee2e2;
+  color: #ef4444;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  margin: 0;
+  font-weight: 600;
+}
+
+/* Buttons */
+.auth-card .button.full {
+  width: 100%;
+  min-height: 48px;
+  background: linear-gradient(135deg, #4318ff 0%, #3311db 100%);
+  border: none;
+  color: #ffffff;
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 8px 20px rgba(67, 24, 255, 0.25);
+  margin-top: 4px;
+}
+
+.auth-card .button.full:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(67, 24, 255, 0.35);
+}
+
+.auth-card .button.full:active {
+  transform: translateY(0);
+}
+
+/* Footer Link Note */
+.auth-card > p:last-of-type {
+  text-align: center;
+  margin-top: 24px;
+  margin-bottom: 0;
+  font-size: 0.85rem;
+  color: #707eae;
+}
+
+.auth-card a {
+  color: #4318ff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-card a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 24px;
+    border-radius: 20px;
+  }
+}
