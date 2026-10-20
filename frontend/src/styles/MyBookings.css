@@ -1,15 +1,4 @@
-:root {
-  --bg-color: #f4f7fe;
-  --card-bg: #ffffff;
-  --text-main: #1b2559;
-  --text-muted: #707eae;
-  --brand-blue: #4318ff;
-  --brand-blue-hover: #3311db;
-  --badge-bg: #eef2ff;
-  --border-color: #e0e5f2;
-  --accent-amber: #b45309;
-  --amber-bg: #fef3c7;
-}
+/* Colour tokens come from styles.css. Do not redeclare :root or body here. */
 
 /* Outer Wrapper Centering */
 .bookings-page-wrapper {

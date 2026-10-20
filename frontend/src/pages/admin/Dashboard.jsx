@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../services/api.js";
-import "../../styles/admin.css";
 
 const getArray = (response) => {
-  const data = response?.data;
+  // api() returns the parsed JSON body directly (an array, or an object
+  // wrapping one), so fall back to the response itself.
+  const data = response?.data ?? response;
 
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.data)) return data.data;
@@ -88,10 +89,10 @@ export default function AdminDashboard() {
 
       try {
         const results = await Promise.allSettled([
-          api.get("/movies"),
-          api.get("/bookings"),
-          api.get("/users"),
-          api.get("/showtimes"),
+          api("/movies"),
+          api("/bookings"),
+          api("/users"),
+          api("/showtimes"),
         ]);
 
         if (!active) return;
@@ -182,204 +183,183 @@ export default function AdminDashboard() {
     })}`;
 
   return (
-    <div className="admin-layout">
-      <main className="admin-main">
-        <header className="admin-topbar">
-          <div className="admin-breadcrumb">
-            Admin <span>/</span> <strong>Dashboard</strong>
+    <>
+      <div className="admin-page-header">
+        <div>
+          <h1>Dashboard</h1>
+          <p className="admin-page-description">
+            A clear overview of your cinema operations.
+          </p>
+        </div>
+
+        <div className="admin-page-actions">
+          <Link
+            to="/admin/movies"
+            className="admin-btn admin-btn-primary"
+          >
+            + Add Movie
+          </Link>
+
+          <Link
+            to="/admin/showtimes"
+            className="admin-btn admin-btn-secondary"
+          >
+            Create Showtime
+          </Link>
+        </div>
+      </div>
+
+      {error && (
+        <div
+          className="admin-alert admin-alert-error"
+          role="alert"
+        >
+          {error}
+        </div>
+      )}
+
+      <div className="admin-stats-grid">
+        <StatCard
+          icon="▣"
+          label="Total Movies"
+          value={movies.length}
+          description="Movies in catalogue"
+          loading={loading}
+        />
+
+        <StatCard
+          icon="▤"
+          label="Total Bookings"
+          value={bookings.length}
+          description="All recorded bookings"
+          loading={loading}
+        />
+
+        <StatCard
+          icon="♙"
+          label="Registered Users"
+          value={users.length}
+          description="Customer and admin accounts"
+          loading={loading}
+        />
+
+        <StatCard
+          icon="◷"
+          label="Shows Today"
+          value={todaysShowtimes.length}
+          description="Scheduled for today"
+          loading={loading}
+        />
+      </div>
+
+      <section className="admin-panel">
+        <div className="admin-panel-header">
+          <div>
+            <h2 className="admin-panel-title">
+              Recent Bookings
+            </h2>
+            <p className="admin-panel-subtitle">
+              The latest booking activity in your cinema.
+            </p>
           </div>
 
-          <div className="admin-topbar-actions">
-            <span className="admin-stat-caption">
-              {today.toLocaleDateString("en-MY", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-            </span>
+          <Link
+            to="/admin/bookings"
+            className="admin-btn admin-btn-secondary admin-btn-sm"
+          >
+            View All →
+          </Link>
+        </div>
+
+        {loading ? (
+          <div className="admin-loading">
+            <span className="admin-spinner" />
+            <div>Loading bookings…</div>
           </div>
-        </header>
-
-        <section className="admin-page">
-          <div className="admin-page-header">
-            <div>
-              <h1>Dashboard</h1>
-              <p className="admin-page-description">
-                A clear overview of your cinema operations.
-              </p>
-            </div>
-
-            <div className="admin-page-actions">
-              <Link
-                to="/admin/movies"
-                className="admin-btn admin-btn-primary"
-              >
-                + Add Movie
-              </Link>
-
-              <Link
-                to="/admin/showtimes"
-                className="admin-btn admin-btn-secondary"
-              >
-                Create Showtime
-              </Link>
-            </div>
+        ) : recentBookings.length === 0 ? (
+          <div className="admin-empty-state">
+            <div className="admin-empty-icon">▤</div>
+            <h3>No bookings yet</h3>
+            <p>
+              New customer bookings will appear here when
+              they are recorded.
+            </p>
           </div>
+        ) : (
+          <div className="admin-table-wrapper">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Booking ID</th>
+                  <th>Customer</th>
+                  <th>Movie</th>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
 
-          {error && (
-            <div
-              className="admin-alert admin-alert-error"
-              role="alert"
-            >
-              {error}
-            </div>
-          )}
+              <tbody>
+                {recentBookings.map((booking) => {
+                  const status = getBookingStatus(booking);
 
-          <div className="admin-stats-grid">
-            <StatCard
-              icon="▣"
-              label="Total Movies"
-              value={movies.length}
-              description="Movies in catalogue"
-              loading={loading}
-            />
+                  const customer =
+                    booking?.user?.name ||
+                    booking?.customer?.name ||
+                    booking?.userName ||
+                    booking?.customerName ||
+                    booking?.user?.email ||
+                    "Customer";
 
-            <StatCard
-              icon="▤"
-              label="Total Bookings"
-              value={bookings.length}
-              description="All recorded bookings"
-              loading={loading}
-            />
+                  const movie =
+                    booking?.movie?.title ||
+                    booking?.showtime?.movie?.title ||
+                    booking?.movieTitle ||
+                    "Movie booking";
 
-            <StatCard
-              icon="♙"
-              label="Registered Users"
-              value={users.length}
-              description="Customer and admin accounts"
-              loading={loading}
-            />
+                  const amount =
+                    booking?.totalAmount ??
+                    booking?.totalPrice ??
+                    booking?.amount ??
+                    0;
 
-            <StatCard
-              icon="◷"
-              label="Shows Today"
-              value={todaysShowtimes.length}
-              description="Scheduled for today"
-              loading={loading}
-            />
-          </div>
+                  return (
+                    <tr key={getId(booking)}>
+                      <td className="admin-cell-primary">
+                        #{String(getId(booking)).slice(-8)}
+                      </td>
 
-          <section className="admin-panel">
-            <div className="admin-panel-header">
-              <div>
-                <h2 className="admin-panel-title">
-                  Recent Bookings
-                </h2>
-                <p className="admin-panel-subtitle">
-                  The latest booking activity in your cinema.
-                </p>
-              </div>
+                      <td>
+                        <strong>{customer}</strong>
+                      </td>
 
-              <Link
-                to="/admin/bookings"
-                className="admin-btn admin-btn-secondary admin-btn-sm"
-              >
-                View All →
-              </Link>
-            </div>
+                      <td>{movie}</td>
 
-            {loading ? (
-              <div className="admin-loading">
-                <span className="admin-spinner" />
-                <div>Loading bookings…</div>
-              </div>
-            ) : recentBookings.length === 0 ? (
-              <div className="admin-empty-state">
-                <div className="admin-empty-icon">▤</div>
-                <h3>No bookings yet</h3>
-                <p>
-                  New customer bookings will appear here when
-                  they are recorded.
-                </p>
-              </div>
-            ) : (
-              <div className="admin-table-wrapper">
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>Booking ID</th>
-                      <th>Customer</th>
-                      <th>Movie</th>
-                      <th>Date</th>
-                      <th>Amount</th>
-                      <th>Status</th>
+                      <td>
+                        {getDate(
+                          booking?.createdAt ||
+                          booking?.bookingDate
+                        )}
+                      </td>
+
+                      <td>{formatMoney(amount)}</td>
+
+                      <td>
+                        <span
+                          className={`admin-status ${statusClass(status)}`}
+                        >
+                          {status.charAt(0).toUpperCase() +
+                            status.slice(1)}
+                        </span>
+                      </td>
                     </tr>
-                  </thead>
-
-                  <tbody>
-                    {recentBookings.map((booking) => {
-                      const status = getBookingStatus(booking);
-
-                      const customer =
-                        booking?.user?.name ||
-                        booking?.customer?.name ||
-                        booking?.userName ||
-                        booking?.customerName ||
-                        booking?.user?.email ||
-                        "Customer";
-
-                      const movie =
-                        booking?.movie?.title ||
-                        booking?.showtime?.movie?.title ||
-                        booking?.movieTitle ||
-                        "Movie booking";
-
-                      const amount =
-                        booking?.totalAmount ??
-                        booking?.totalPrice ??
-                        booking?.amount ??
-                        0;
-
-                      return (
-                        <tr key={getId(booking)}>
-                          <td className="admin-cell-primary">
-                            #{String(getId(booking)).slice(-8)}
-                          </td>
-
-                          <td>
-                            <strong>{customer}</strong>
-                          </td>
-
-                          <td>{movie}</td>
-
-                          <td>
-                            {getDate(
-                              booking?.createdAt ||
-                              booking?.bookingDate
-                            )}
-                          </td>
-
-                          <td>{formatMoney(amount)}</td>
-
-                          <td>
-                            <span
-                              className={`admin-status ${statusClass(status)}`}
-                            >
-                              {status.charAt(0).toUpperCase() +
-                                status.slice(1)}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-
-        </section>
-      </main>
-    </div>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </>
   );
 }

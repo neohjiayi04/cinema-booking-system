@@ -1,22 +1,4 @@
-:root {
-  --bg-color: #f4f7fe;
-  --card-bg: #ffffff;
-  --primary-white: #ffffff;
-  --text-main: #1b2559;
-  --text-muted: #707eae;
-  --accent-blue: #2b3674;
-  --brand-blue: #4318ff;
-  --brand-blue-hover: #3311db;
-  --border-color: #e0e5f2;
-}
-
-body {
-  background-color: var(--bg-color);
-  color: var(--text-main);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  margin: 0;
-  padding: 0;
-}
+/* Colour tokens come from styles.css. Do not redeclare :root or body here. */
 
 /* Page Wrapper */
 .confirmation-wrapper {

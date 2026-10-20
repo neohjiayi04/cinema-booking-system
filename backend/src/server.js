@@ -339,6 +339,17 @@ app.get("/api/bookings", requireAuth, requireAdmin, async (_req, res) => {
   res.json(bookings);
 });
 
+// Admin: list registered users (used by the dashboard count)
+app.get("/api/users", requireAuth, requireAdmin, async (_req, res) => {
+  const users = await getDb()
+    .collection("users")
+    .find({})
+    .sort({ _id: -1 })
+    .toArray();
+
+  res.json(users.map(safeUser));
+});
+
 function generateReference() {
   const d = new Date();
   const stamp = d.toISOString().replace(/\D/g, "").slice(0, 14);

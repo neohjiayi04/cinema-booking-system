@@ -1,0 +1,204 @@
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 70px;
+  /* line up with the page container (min(1180px, 90vw), centered) */
+  padding: 0 max(20px, calc((100vw - min(1180px, 90vw)) / 2));
+  background: var(--admin-nav-bg);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--admin-border);
+}
+
+/* Brand */
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  color: var(--admin-text);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.brand-mark {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #4318ff, #6ad2ff);
+  box-shadow: 0 0 12px rgba(67, 24, 255, 0.4);
+}
+
+.navbar-brand-label {
+  padding: 3px 8px;
+  border: 1px solid var(--admin-accent-line);
+  border-radius: 999px;
+  background: var(--admin-accent-soft);
+  color: var(--admin-accent-text);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+/* Links */
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.navbar-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--admin-text-secondary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--admin-transition),
+    color var(--admin-transition);
+}
+
+.navbar-link:hover {
+  background: var(--admin-accent-soft);
+  color: var(--admin-accent-text);
+}
+
+.navbar-link.active {
+  background: var(--admin-accent-soft);
+  color: var(--admin-accent-text);
+  font-weight: 600;
+}
+
+.navbar-divider {
+  width: 1px;
+  height: 22px;
+  margin: 0 8px;
+  background: var(--admin-border);
+}
+
+.navbar-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 20px;
+  border-radius: 999px;
+  background: var(--admin-accent);
+  box-shadow: 0 4px 14px rgba(67, 24, 255, 0.3);
+  color: var(--admin-on-accent);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition:
+    background var(--admin-transition),
+    transform var(--admin-transition),
+    box-shadow var(--admin-transition);
+}
+
+.navbar-cta:hover {
+  background: var(--admin-accent-hover);
+  box-shadow: var(--admin-accent-glow);
+  transform: translateY(-1px);
+}
+
+.navbar :focus-visible {
+  outline: 2px solid var(--admin-accent);
+  outline-offset: 2px;
+}
+
+/* Mobile menu button (hidden on desktop) */
+.navbar-toggle {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 42px;
+  height: 42px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  cursor: pointer;
+}
+
+.navbar-toggle span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: transform var(--admin-transition), opacity var(--admin-transition);
+}
+
+.navbar-toggle[aria-expanded="true"] span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.navbar-toggle[aria-expanded="true"] span:nth-child(2) {
+  opacity: 0;
+}
+
+.navbar-toggle[aria-expanded="true"] span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+/* Mobile: links collapse into a dropdown panel under the bar */
+@media (max-width: 760px) {
+  .navbar {
+    gap: 12px;
+  }
+
+  .navbar-toggle {
+    display: inline-flex;
+  }
+
+  .navbar-links {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    margin: 0;
+    padding: 12px max(20px, calc((100vw - min(1180px, 90vw)) / 2)) 18px;
+    border-bottom: 1px solid var(--admin-border);
+    background: var(--admin-surface);
+    box-shadow: var(--admin-shadow);
+  }
+
+  .navbar-links.is-open {
+    display: flex;
+  }
+
+  .navbar-link {
+    min-height: 44px;
+  }
+
+  .navbar-divider {
+    width: 100%;
+    height: 1px;
+    margin: 6px 0;
+  }
+
+  .navbar-cta {
+    min-height: 44px;
+  }
+}
