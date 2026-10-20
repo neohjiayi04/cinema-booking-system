@@ -5,13 +5,6 @@
   --admin-topbar-height: 76px;
 }
 
-
-/* =========================================================
-   ADMIN THEME: LIGHT / ELEGANT
-   Warm ivory canvas, white cards, refined indigo accent.
-   Every colour in this file comes from these tokens, so
-   tweak the palette here and the whole admin follows.
-   ========================================================= */
 body .admin-layout {
   /* Canvas and surfaces */
   --admin-bg: #f6f5fb;
@@ -349,23 +342,13 @@ body:has(.admin-layout) {
   z-index: 50;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 20px;
   min-height: var(--admin-topbar-height);
   padding: 16px 38px;
   border-bottom: 1px solid var(--admin-border);
   background: rgba(255, 255, 255, 0.78);
   backdrop-filter: blur(16px);
-}
-
-.admin-topbar h2 {
-  margin: 5px 0 0;
-  font-size: 22px;
-  font-weight: 700;
-}
-
-.admin-topbar-eyebrow {
-  display: block;
 }
 
 .admin-topbar-date {
@@ -2268,4 +2251,273 @@ body:has(.admin-layout) {
 /* Selection and scrollbars */
 ::selection {
   background: rgba(91, 91, 240, 0.20);
+}
+
+
+/* 24. TOPBAR PAGE TITLE
+   The title and description now live in the topbar and change per route.
+   --------------------------------------------------------- */
+.admin-layout .admin-topbar h1 {
+  margin: 4px 0 0;
+  font-family: var(--admin-font-display);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.admin-topbar-description {
+  margin: 3px 0 0;
+  color: var(--admin-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+
+
+.admin-page-header:empty {
+  display: none;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .admin-topbar-description {
+    display: none;
+  }
+
+  .admin-page-header {
+    justify-content: stretch;
+  }
+}
+
+
+/* 25. ADMIN PROFILE PAGE
+   Single centred column: identity card, personal information,
+   account security.
+   --------------------------------------------------------- */
+.admin-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+/* Identity card */
+.admin-profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 28px 32px;
+  border: 1px solid var(--admin-border);
+  border-radius: 24px;
+  background:
+    radial-gradient(420px 160px at 0% 0%, rgba(124, 77, 255, 0.09), transparent 70%),
+    var(--admin-surface);
+  box-shadow: var(--admin-shadow-card);
+}
+
+.admin-profile-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--admin-gradient);
+  box-shadow: 0 12px 26px rgba(91, 91, 240, 0.35);
+  color: #fff;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.admin-profile-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.admin-profile-identity h2 {
+  margin: 0;
+  color: var(--admin-text);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.admin-profile-email {
+  margin: 0 0 8px;
+  color: var(--admin-text-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.admin-profile-logout {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Cards */
+.admin-profile-card {
+  padding: 32px 36px;
+  border: 1px solid var(--admin-border);
+  border-radius: 24px;
+  background: var(--admin-surface);
+  box-shadow: var(--admin-shadow-card);
+}
+
+.admin-profile-card h2 {
+  margin: 0 0 6px;
+  color: var(--admin-text);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.admin-profile-card p {
+  margin: 0;
+  color: var(--admin-text-muted);
+  font-size: 14px;
+}
+
+.admin-profile-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 26px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.admin-profile-edit {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--admin-accent-line);
+  border-radius: 12px;
+  background: var(--admin-accent-soft);
+  color: var(--admin-accent-text);
+  font-size: 16px;
+}
+
+.admin-profile-card .admin-alert {
+  margin-bottom: 22px;
+}
+
+/* Form */
+.admin-profile-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-profile-form label {
+  margin: 0 0 8px;
+  color: var(--admin-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-profile-form input {
+  width: 100%;
+  min-height: 50px;
+  margin-bottom: 22px;
+  padding: 12px 18px;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 14px;
+  background: var(--admin-bg-deep);
+  color: var(--admin-text);
+  font-size: 15px;
+  outline: none;
+  transition: border-color var(--admin-transition), box-shadow var(--admin-transition), background var(--admin-transition);
+}
+
+.admin-profile-form input:focus {
+  border-color: var(--admin-accent);
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(91, 91, 240, 0.14);
+}
+
+.admin-profile-readonly {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 50px;
+  margin-bottom: 26px;
+  padding: 12px 18px;
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  background: var(--admin-surface-raised);
+  color: var(--admin-text);
+  font-size: 15px;
+}
+
+.admin-profile-readonly span {
+  color: var(--admin-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-profile-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.admin-profile-actions .admin-btn {
+  min-height: 48px;
+  padding-right: 24px;
+  padding-left: 24px;
+  font-size: 13px;
+}
+
+/* Security card */
+.admin-profile-security {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.admin-profile-security p {
+  max-width: 520px;
+  line-height: 1.6;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .admin-profile-hero {
+    flex-direction: column;
+    padding: 28px 20px;
+    text-align: center;
+  }
+
+  .admin-profile-identity {
+    align-items: center;
+  }
+
+  .admin-profile-logout {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .admin-profile-card {
+    padding: 24px 20px;
+  }
+
+  .admin-profile-security {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .admin-profile-actions .admin-btn {
+    flex: 1;
+  }
 }

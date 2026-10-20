@@ -21,13 +21,22 @@ export default function Halls() {
 
   return (
     <section>
-      <span className="eyebrow">ADMIN</span><h1>Hall Management</h1>
+      <div className="admin-page-header">
+        <div>
+          <h1>Halls</h1>
+          <p className="admin-page-description">
+            Manage your cinema halls and seating arrangements.
+          </p>
+        </div>
+      </div>
+      
       <form className="admin-form inline" onSubmit={submit}>
         <input placeholder="Hall name" value={form.name} onChange={e => setForm({...form,name:e.target.value})} required />
         <input type="number" min="1" placeholder="Rows" value={form.rows} onChange={e => setForm({...form,rows:e.target.value})} />
         <input type="number" min="1" placeholder="Seats/row" value={form.seatsPerRow} onChange={e => setForm({...form,seatsPerRow:e.target.value})} />
         <button className="button">Add Hall</button>
       </form>
+      
       <div className="table">
         {halls.map(h => (
           <div className="table-row" key={h._id}>

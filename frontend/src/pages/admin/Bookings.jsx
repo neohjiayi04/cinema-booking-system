@@ -8,7 +8,14 @@ export default function Bookings() {
 
   return (
     <section>
-      <span className="eyebrow">ADMIN</span><h1>Booking Management</h1>
+      <div className="admin-page-header">
+        <div>
+          <h1>Bookings</h1>
+          <p className="admin-page-description">
+            Manage and view all cinema bookings.
+          </p>
+        </div>
+      </div>
       <div className="table">
         {bookings.map(b => (
           <div className="table-row" key={b._id}>

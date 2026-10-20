@@ -68,10 +68,6 @@ export default function AdminLayout() {
 
       <div className="admin-main">
         <header className="admin-topbar">
-          <div>
-            <span className="admin-topbar-eyebrow">CINEMAX MANAGEMENT</span>
-            <h2>Admin Workspace</h2>
-          </div>
 
           <div className="admin-topbar-actions">
             <span className="admin-topbar-date">{today}</span>
@@ -81,7 +77,7 @@ export default function AdminLayout() {
             >
               View Site
             </Link>
-            <span className="admin-role-badge">Administrator</span>
+            <span className="admin-role-badge">Admin</span>
           </div>
         </header>
 

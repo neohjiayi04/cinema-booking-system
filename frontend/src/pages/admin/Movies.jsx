@@ -34,7 +34,14 @@ export default function Movies() {
 
   return (
     <section>
-      <span className="eyebrow">ADMIN</span><h1>Movie Management</h1>
+      <div className="admin-page-header">
+        <div>
+          <h1>Movies</h1>
+          <p className="admin-page-description">
+            Manage your cinema movies and details.
+          </p>
+        </div>
+      </div>
       <form className="admin-form" onSubmit={submit}>
         <input placeholder="Title" value={form.title} onChange={e => setForm({...form,title:e.target.value})} required />
         <input placeholder="Genre" value={form.genre} onChange={e => setForm({...form,genre:e.target.value})} />

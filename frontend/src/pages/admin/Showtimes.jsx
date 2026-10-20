@@ -27,7 +27,15 @@ export default function Showtimes() {
 
   return (
     <section>
-      <span className="eyebrow">ADMIN</span><h1>Showtime Management</h1>
+      <div className="admin-page-header">
+        <div>
+          <h1>Showtimes</h1>
+          <p className="admin-page-description">
+            Manage your cinema showtimes and schedules.
+          </p>
+        </div>
+      </div>
+      
       <form className="admin-form" onSubmit={submit}>
         <select value={form.movieId} onChange={e => setForm({...form,movieId:e.target.value})}>
           {movies.map(m => <option key={m._id} value={m._id}>{m.title}</option>)}
