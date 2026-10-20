@@ -1031,7 +1031,6 @@ body:has(.admin-layout) {
 
 /* 12. CINEMA HALLS AND SEAT MAP
    --------------------------------------------------------- */
-
 .admin-hall-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
