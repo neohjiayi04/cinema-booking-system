@@ -1,164 +1,241 @@
-import { useEffect, useState, useMemo } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useAuth } from "../context/AuthContext.jsx";
+import SeatMap from "../components/SeatMap.jsx";
 import { api } from "../services/api.js";
+import { connectShowtime } from "../services/websocket.js";
 import "../styles/MovieDetails.css";
 
+const PENDING_KEY = "cinemax.pendingBooking";
+
 export default function MovieDetails() {
-  const { id } = useParams();
+  const { id: movieId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const resumeBooking = searchParams.get("resumeBooking") === "1";
+
   const [movie, setMovie] = useState(null);
   const [showtimes, setShowtimes] = useState([]);
-  const [selectedHall, setSelectedHall] = useState("All");
-  const [error, setError] = useState("");
+  const [selectedShowtimeId, setSelectedShowtimeId] = useState("");
+  const [showtimeDetails, setShowtimeDetails] = useState(null);
+  const [selectedSeats, setSelectedSeats] = useState([]);
+  const [bookedSeats, setBookedSeats] = useState([]);
+  const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [seatLoading, setSeatLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const [resumeReady, setResumeReady] = useState(false);
+  const resumedRef = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
-    Promise.all([api(`/movies/${id}`), api(`/showtimes?movieId=${id}`)])
-      .then(([m, s]) => {
-        setMovie(m);
-        setShowtimes(s || []);
-        setLoading(false);
+    Promise.all([api(`/movies/${movieId}`), api(`/showtimes?movieId=${movieId}`)])
+      .then(([movieData, showtimeData]) => {
+        if (cancelled) return;
+        setMovie(movieData);
+        setShowtimes(showtimeData || []);
+        const saved = (() => {
+          try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"); }
+          catch { return null; }
+        })();
+        const savedShowtime = saved?.movieId === movieId ? saved.showtimeId : "";
+        setSelectedShowtimeId(savedShowtime || showtimeData?.[0]?._id || "");
       })
-      .catch((e) => {
-        setError(e.message || "Unable to load movie details.");
-        setLoading(false);
-      });
-  }, [id]);
+      .catch((e) => !cancelled && setError(e.message || "Unable to load movie details."))
+      .finally(() => !cancelled && setLoading(false));
+    return () => { cancelled = true; };
+  }, [movieId]);
 
-  const halls = useMemo(() => {
-    const hallMap = new Map();
-    hallMap.set("All", { _id: "All", name: "All Halls" });
+  useEffect(() => {
+    if (!selectedShowtimeId) {
+      setShowtimeDetails(null);
+      setBookedSeats([]);
+      setSelectedSeats([]);
+      return;
+    }
 
-    showtimes.forEach((s) => {
-      if (s.hall) {
-        const hallKey = s.hall._id || s.hall.name;
-        if (!hallMap.has(hallKey)) {
-          hallMap.set(hallKey, s.hall);
+    let cancelled = false;
+    let socket;
+    setSeatLoading(true);
+    setError("");
+    setSelectedSeats([]);
+    setResumeReady(false);
+
+    api(`/showtimes/${selectedShowtimeId}`)
+      .then((data) => {
+        if (cancelled) return;
+        setShowtimeDetails(data);
+        setBookedSeats(data.bookedSeats || []);
+        const saved = (() => {
+          try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"); }
+          catch { return null; }
+        })();
+        if (saved?.movieId === movieId && saved?.showtimeId === selectedShowtimeId && Array.isArray(saved.seats)) {
+          const stillAvailable = saved.seats.filter((seat) => !(data.bookedSeats || []).includes(seat));
+          setSelectedSeats(stillAvailable);
+          setResumeReady(true);
+          if (stillAvailable.length !== saved.seats.length) {
+            setError("One or more seats were booked while you were signing in. Please review your seats.");
+            sessionStorage.removeItem(PENDING_KEY);
+          }
         }
+      })
+      .catch((e) => !cancelled && setError(e.message || "Unable to load seats."))
+      .finally(() => !cancelled && setSeatLoading(false));
+
+    socket = connectShowtime(selectedShowtimeId, (message) => {
+      if (message.type === "CONNECTED" || message.type === "JOINED_SHOWTIME") setConnected(true);
+      if (message.type === "SEAT_BOOKED") {
+        setBookedSeats((previous) => [...new Set([...previous, ...(message.seats || [])])]);
+        setSelectedSeats((previous) => previous.filter((seat) => !(message.seats || []).includes(seat)));
       }
     });
-    return Array.from(hallMap.values());
-  }, [showtimes]);
 
-  const filteredShowtimes = useMemo(() => {
-    if (selectedHall === "All") return showtimes;
-    return showtimes.filter((s) => {
-      const hallKey = s.hall?._id || s.hall?.name;
-      return hallKey === selectedHall;
-    });
-  }, [showtimes, selectedHall]);
+    return () => { cancelled = true; socket?.close(); setConnected(false); };
+  }, [selectedShowtimeId, movieId]);
 
-  if (error) {
-    return (
-      <div className="movie-detail-container">
-        <div className="detail-state-container error-state">
-          <p className="error">{error}</p>
-        </div>
-      </div>
-    );
+  const total = useMemo(
+    () => selectedSeats.length * Number(showtimeDetails?.price || 0),
+    [selectedSeats, showtimeDetails]
+  );
+
+  const createBooking = useCallback(async (showtimeId, seats) => {
+    if (!showtimeId || !seats?.length || isSubmitting) return;
+    setError("");
+    setIsSubmitting(true);
+    try {
+      const booking = await api("/bookings", {
+        method: "POST",
+        body: JSON.stringify({ showtimeId, seats })
+      });
+      sessionStorage.removeItem(PENDING_KEY);
+      navigate(`/booking-confirmation/${booking._id}`, { replace: true });
+    } catch (e) {
+      setError(e.message || "Booking failed. Please check seat availability and try again.");
+      setIsSubmitting(false);
+      resumedRef.current = true;
+    }
+  }, [isSubmitting, navigate]);
+
+  useEffect(() => {
+    if (!resumeBooking || !user || !resumeReady || !showtimeDetails || !selectedSeats.length || resumedRef.current || isSubmitting) return;
+    const saved = (() => {
+      try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"); }
+      catch { return null; }
+    })();
+    if (saved?.movieId !== movieId || saved?.showtimeId !== selectedShowtimeId) return;
+    resumedRef.current = true;
+    createBooking(selectedShowtimeId, selectedSeats);
+  }, [resumeBooking, user, resumeReady, showtimeDetails, selectedSeats, movieId, selectedShowtimeId, isSubmitting, createBooking]);
+
+  function toggleSeat(seat) {
+    setSelectedSeats((previous) => previous.includes(seat)
+      ? previous.filter((item) => item !== seat)
+      : [...previous, seat]);
   }
 
-  if (loading || !movie) {
-    return (
-      <div className="movie-detail-container">
-        <div className="detail-state-container">
-          <p>Loading cinematic experience...</p>
-        </div>
-      </div>
-    );
+  function confirmBooking() {
+    if (!selectedShowtimeId || !selectedSeats.length || isSubmitting) return;
+    setError("");
+    if (!user) {
+      sessionStorage.setItem(PENDING_KEY, JSON.stringify({
+        movieId,
+        showtimeId: selectedShowtimeId,
+        seats: selectedSeats
+      }));
+      const returnTo = `/movies/${movieId}?resumeBooking=1`;
+      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
+    createBooking(selectedShowtimeId, selectedSeats);
   }
+
+  if (loading) return <div className="combined-state">Loading movie and showtimes…</div>;
+  if (!movie) return <div className="combined-state combined-error">{error || "Movie not found."}<p><Link to="/">Back to movies</Link></p></div>;
 
   return (
-    <div className="movie-detail-container">
-      <div className="detail-ambient-glow" />
+    <div className="combined-booking-page">
+      <Link className="combined-back-link" to="/">← Back to all movies</Link>
 
-      {/* HERO SECTION */}
-      <section className="detail-hero-section">
-        <div className="detail-grid">
-          <div className="detail-poster-wrapper">
-            <div className="detail-poster-card">
-              <img
-                className="detail-poster"
-                src={movie.poster || "https://placehold.co/400x600?text=Movie"}
-                alt={movie.title}
-              />
-            </div>
+      <section className="combined-movie-hero">
+        <div className="combined-poster-wrap">
+          <img className="combined-poster" src={movie.poster || "https://placehold.co/400x600?text=Movie"} alt={`${movie.title} poster`} />
+        </div>
+        <div className="combined-movie-copy">
+          <span className="combined-eyebrow">NOW SHOWING</span>
+          <h1>{movie.title}</h1>
+          <div className="combined-meta">
+            <span>{Array.isArray(movie.genre) ? movie.genre.join(" · ") : movie.genre}</span>
+            {movie.duration && <span>{movie.duration} min</span>}
+            {movie.rating && <span>{movie.rating}</span>}
           </div>
-
-          <div className="detail-content">
-            <span className="badge">
-              {Array.isArray(movie.genre) ? movie.genre.join(" • ") : movie.genre}
-            </span>
-            <h1>{movie.title}</h1>
-
-            <div className="movie-meta-tags">
-              <span>⏱️ {movie.duration} min</span>
-              <span>⭐ {movie.rating || "PG-13"}</span>
-            </div>
-
-            <p className="detail-synopsis">
-              {movie.description || movie.synopsis}
-            </p>
-
-            <div className="detail-actions">
-              <a href="#showtimes-section" className="btn-primary">
-                Reserve Seats
-              </a>
-            </div>
-          </div>
+          <p>{movie.description || movie.synopsis || "Choose a screening and your seats to book this movie."}</p>
         </div>
       </section>
 
-      {/* SHOWTIMES SECTION */}
-      <section id="showtimes-section" className="showtimes-section-wrap">
-        <div className="showtimes-section-header">
-          <div>
-            <span className="eyebrow">SCREENINGS & TICKETS</span>
-            <h2>Showtimes</h2>
-            <p>Select your screening slot below</p>
-          </div>
-
-          {halls.length > 1 && (
-            <div className="hall-filter-chips">
-              {halls.map((hall) => {
-                const hallKey = hall._id || hall.name;
-                const isActive = selectedHall === hallKey;
-                return (
-                  <button
-                    key={hallKey}
-                    onClick={() => setSelectedHall(hallKey)}
-                    className={`hall-chip ${isActive ? "active" : ""}`}
-                  >
-                    {hall.name}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+      <section className="combined-section" id="showtimes-section">
+        <div className="combined-section-heading">
+          <div><span className="combined-eyebrow">01 / SCREENING</span><h2>Choose a showtime</h2></div>
+          <span className="combined-step-note">Select one screening</span>
         </div>
+        {showtimes.length ? (
+          <div className="combined-showtime-grid">
+            {showtimes.map((showtime) => {
+            const active = selectedShowtimeId === showtime._id;
+            return (
+              <button 
+                type="button" 
+                key={showtime._id} 
+                className={`combined-showtime ${active ? "active" : ""}`} 
+                onClick={() => { setSelectedShowtimeId(showtime._id); setError(""); resumedRef.current = false; }}
+              >
+                {/* Active Checkmark Badge */}
+                {active && <span className="combined-showtime-check">✓</span>}
 
-        {filteredShowtimes.length > 0 ? (
-          <div className="showtime-grid">
-            {filteredShowtimes.map((s) => (
-              <Link className="showtime-card" key={s._id} to={`/booking/${s._id}`}>
-                <div className="showtime-time-info">
-                  <span className="showtime-time">{s.startTime}</span>
-                  <span className="showtime-date">{s.date}</span>
+                {/* Date at the top */}
+                <span className="combined-showtime-date">{showtime.date}</span>
+
+                {/* Big bold time in the middle */}
+                <strong>{showtime.startTime}</strong>
+
+                {/* Hall info & Price pill container at the bottom */}
+                <div className="combined-showtime-footer">
+                  <span className="combined-showtime-hall-badge">{showtime.hall?.name || "Cinema Hall"}</span>
+                  <span className="combined-showtime-price">RM {Number(showtime.price || 0).toFixed(2)}</span>
                 </div>
-                <div className="showtime-divider" />
-                <div className="showtime-venue-info">
-                  <span className="hall-badge">{s.hall?.name || "Main Hall"}</span>
-                  <span className="showtime-price">RM {s.price}</span>
-                </div>
-              </Link>
-            ))}
+              </button>
+            );
+          })}
           </div>
-        ) : (
-          <div className="no-showtimes">
-            <p>No screening slots available for this filter.</p>
-          </div>
+        ) : <p className="combined-empty">There are no showtimes available for this movie yet.</p>}
+      </section>
+
+      <section className="combined-section combined-seats-section">
+        <div className="combined-section-heading">
+          <div><span className="combined-eyebrow">02 / SEATING</span><h2>Select your seats</h2></div>
+          {showtimeDetails && <span className={`combined-live-status ${connected ? "is-live" : ""}`}><i />{connected ? "Live seat updates" : "Connecting to live seating"}</span>}
+        </div>
+        {!selectedShowtimeId ? <p className="combined-empty">Choose a showtime above to see its seating plan.</p> : seatLoading || !showtimeDetails ? <p className="combined-empty">Loading the seating plan…</p> : (
+          <>
+            <div className="combined-selected-screening"><strong>{showtimeDetails.hall?.name || "Cinema Hall"}</strong><span>{showtimeDetails.date} · {showtimeDetails.startTime}</span></div>
+            <div className="combined-seat-map"><SeatMap rows={showtimeDetails.hall.rows} seatsPerRow={showtimeDetails.hall.seatsPerRow} bookedSeats={bookedSeats} selectedSeats={selectedSeats} onToggle={toggleSeat} /></div>
+          </>
         )}
       </section>
+
+      {error && <div className="combined-error-banner" role="alert">{error}</div>}
+
+      <section className="combined-checkout">
+        <div className="combined-checkout-seats"><span className="combined-eyebrow">YOUR SELECTION</span><strong>{showtimeDetails.hall?.name || "Cinema Hall"} - {selectedSeats.length ? selectedSeats.join(", ") : "No seats selected"}</strong><small> {selectedSeats.length} {selectedSeats.length === 1 ? "seat" : "seats"} · No payment required</small></div>
+        <div className="combined-checkout-total"><span>Total</span><strong>RM {total.toFixed(2)}</strong></div>
+        <button className="combined-confirm-button" onClick={confirmBooking} disabled={!selectedShowtimeId || !selectedSeats.length || seatLoading || isSubmitting}>
+          {isSubmitting ? "Creating booking…" : user ? "Confirm Booking →" : "Login to Confirm →"}
+        </button>
+      </section>
+      <p className="combined-auth-note">{user ? `Signed in as ${user.name || user.email}.` : "You'll be asked to log in or register before your booking is created. Your selection will be kept."}</p>
     </div>
   );
 }

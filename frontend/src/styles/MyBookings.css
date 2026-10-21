@@ -163,8 +163,8 @@
 
 /* Highlight Grid Box */
 .ticket-info-grid {
-  background: #f8fafc;
-  border: 1px solid #edf2f7;
+  background: #ebf5ffbe;
+  border: 1px solid #8bc1f8;
   border-radius: 16px;
   padding: 16px;
   display: grid;

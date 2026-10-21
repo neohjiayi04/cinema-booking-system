@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get("returnTo") || "/";
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
 
@@ -12,15 +14,14 @@ export default function Register() {
     e.preventDefault();
     setError("");
     try {
-      await register(form.name, form.email, form.password);
-      navigate("/");
+      const user = await register(form.name, form.email, form.password);
+      navigate(user.role === "admin" ? "/admin" : returnTo, { replace: true });
     } catch (err) {
       setError(err.message);
     }
   }
 
   return (
-  <div className="auth-page-wrapper">
     <section className="auth-card">
       <h1>Create Account</h1>
       <p>Register as a cinema customer.</p>
@@ -31,8 +32,7 @@ export default function Register() {
         {error && <p className="error">{error}</p>}
         <button className="button full">Register</button>
       </form>
-      <p>Already registered? <Link to="/login">Login</Link></p>
+      <p>Already registered? <Link to={`/login${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}>Login</Link></p>
     </section>
-  </div>
   );
 }
