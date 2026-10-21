@@ -66,7 +66,6 @@ export default function UserProfile() {
     <section className="profile-page">
       <div className="profile-heading">
         <div>
-          <p className="profile-eyebrow">YOUR ACCOUNT</p>
           <h1>My Profile</h1>
           <p className="profile-subtitle">
             Manage your personal information and account.

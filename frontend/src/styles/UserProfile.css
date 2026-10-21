@@ -6,14 +6,6 @@
   margin-bottom: 32px;
 }
 
-.profile-eyebrow {
-  color: #4318ff;
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 2.5px;
-  margin: 0 0 10px;
-}
-
 .profile-heading h1 {
   margin: 0;
   font-family: var(--font-serif);
