@@ -83,7 +83,7 @@
   border: 1px solid var(--border-color);
   box-shadow: 0 10px 30px rgba(112, 126, 174, 0.06);
   display: grid;
-  grid-template-columns: 140px 1fr 240px;
+  grid-template-columns: 200px 1fr 240px;
   overflow: hidden;
   position: relative;
   transition: transform 0.2s ease, box-shadow 0.2s ease;

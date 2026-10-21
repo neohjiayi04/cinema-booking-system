@@ -82,9 +82,18 @@ export default function MyBookings() {
                 {/* 1. Poster Thumbnail */}
                 <div className="ticket-poster-container">
                   <img
-                    src={b.movie?.posterUrl || "https://via.placeholder.com/150x220?text=Movie+Poster"}
+                    src={
+                      b.movie?.poster ||
+                      b.movie?.posterUrl ||
+                      "https://placehold.co/150x220?text=No+Poster"
+                    }
                     alt={b.movie?.title || "Movie"}
                     className="ticket-poster"
+                    onError={(e) => {
+                      e.currentTarget.onerror = null;
+                      e.currentTarget.src =
+                        "https://placehold.co/150x220?text=No+Poster";
+                    }}
                   />
                 </div>
 
