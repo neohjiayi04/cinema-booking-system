@@ -218,21 +218,21 @@ export default function Halls() {
             <div className="admin-form-actions">
               {isEditing && (
                 <button
-                  type="button"
-                  className="admin-btn admin-btn-secondary"
-                  onClick={resetForm}
-                  disabled={saving}
-                >
-                  Cancel
-                </button>
-              )}
-              <button
                 type="submit"
                 className="admin-btn admin-btn-primary"
                 disabled={saving}
-              >
-                {saving ? "Saving..." : isEditing ? "Save Changes" : "+ Add Hall"}
-              </button>
+                >
+                  {saving ? "Saving..." : isEditing ? "Save Changes" : "+ Add Hall"}
+                </button>
+              )}
+                <button
+                    type="button"
+                    className="admin-btn admin-btn-secondary"
+                    onClick={resetForm}
+                    disabled={saving}
+                  >
+                    Cancel
+                  </button>
             </div>
           </form>
         </div>

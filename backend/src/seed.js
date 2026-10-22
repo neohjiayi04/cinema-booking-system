@@ -4,37 +4,47 @@ import { hashPassword } from "./auth.js";
 await connectDb();
 const db = getDb();
 
-await db.collection("users").deleteMany({});
-await db.collection("movies").deleteMany({});
-await db.collection("halls").deleteMany({});
-await db.collection("showtimes").deleteMany({});
-await db.collection("bookings").deleteMany({});
+/**
+ * Safe, repeatable demo-data seeder.
+ * Existing records are preserved; this script only inserts missing demo records.
+ * It intentionally does not delete bookings, users, movies, halls, or showtimes.
+ */
+async function ensureRecord(collectionName, filter, document) {
+  const collection = db.collection(collectionName);
+  await collection.updateOne(filter, { $setOnInsert: document }, { upsert: true });
+  return collection.findOne(filter);
+}
 
-const admin = {
+const passwordHash = await hashPassword("Admin123!");
+await ensureRecord("users", { email: "admin@cinema.local" }, {
   name: "Cinema Admin",
   email: "admin@cinema.local",
-  passwordHash: await hashPassword("Admin123!"),
+  passwordHash,
   role: "admin",
   createdAt: new Date()
-};
+});
 
-const customer = {
+const customerPasswordHash = await hashPassword("Customer123!");
+await ensureRecord("users", { email: "customer@cinema.local" }, {
   name: "Demo Customer",
   email: "customer@cinema.local",
-  passwordHash: await hashPassword("Customer123!"),
+  passwordHash: customerPasswordHash,
   role: "customer",
   createdAt: new Date()
-};
+});
 
-await db.collection("users").insertMany([admin, customer]);
-
-const halls = await db.collection("halls").insertMany([
+const hallSeed = [
   { name: "Hall 1", rows: 5, seatsPerRow: 8 },
   { name: "Hall 2", rows: 6, seatsPerRow: 10 },
   { name: "Hall 3", rows: 8, seatsPerRow: 10 }
-]);
+];
 
-const movies = await db.collection("movies").insertMany([
+const halls = [];
+for (const hall of hallSeed) {
+  halls.push(await ensureRecord("halls", { name: hall.name }, hall));
+}
+
+const movieSeed = [
   {
     title: "Neon Horizon",
     description: "A science-fiction adventure beyond the edge of the known world.",
@@ -65,20 +75,44 @@ const movies = await db.collection("movies").insertMany([
     releaseDate: "2026-09-18",
     status: "NOW_SHOWING"
   }
-]);
+];
 
-const movieIds = Object.values(movies.insertedIds);
-const hallIds = Object.values(halls.insertedIds);
+const movies = [];
+for (const movie of movieSeed) {
+  movies.push(await ensureRecord("movies", { title: movie.title }, movie));
+}
 
-await db.collection("showtimes").insertMany([
-  { movieId: movieIds[0], hallId: hallIds[0], date: "2026-10-10", startTime: "14:00", price: 18, status: "ACTIVE" },
-  { movieId: movieIds[0], hallId: hallIds[1], date: "2026-10-10", startTime: "20:30", price: 22, status: "ACTIVE" },
-  { movieId: movieIds[1], hallId: hallIds[2], date: "2026-10-11", startTime: "17:00", price: 20, status: "ACTIVE" },
-  { movieId: movieIds[2], hallId: hallIds[0], date: "2026-10-11", startTime: "19:30", price: 18, status: "ACTIVE" }
-]);
+const showtimeSeed = [
+  { movieTitle: "Neon Horizon", hallName: "Hall 1", date: "2026-10-10", startTime: "14:00", price: 18, status: "ACTIVE" },
+  { movieTitle: "Neon Horizon", hallName: "Hall 2", date: "2026-10-10", startTime: "20:30", price: 22, status: "ACTIVE" },
+  { movieTitle: "The Last Signal", hallName: "Hall 3", date: "2026-10-11", startTime: "17:00", price: 20, status: "ACTIVE" },
+  { movieTitle: "Moonlight Avenue", hallName: "Hall 1", date: "2026-10-11", startTime: "19:30", price: 18, status: "ACTIVE" }
+];
 
-console.log("Seed completed.");
-console.log("Admin: admin@cinema.local / Admin123!");
-console.log("Customer: customer@cinema.local / Customer123!");
+for (const showtime of showtimeSeed) {
+  const movie = movies.find((item) => item.title === showtime.movieTitle);
+  const hall = halls.find((item) => item.name === showtime.hallName);
+  await ensureRecord(
+    "showtimes",
+    {
+      movieId: movie._id,
+      hallId: hall._id,
+      date: showtime.date,
+      startTime: showtime.startTime
+    },
+    {
+      movieId: movie._id,
+      hallId: hall._id,
+      date: showtime.date,
+      startTime: showtime.startTime,
+      price: showtime.price,
+      status: showtime.status,
+      createdAt: new Date()
+    }
+  );
+}
 
+console.log("Demo seed completed. Existing records were preserved.");
+console.log("Admin demo login: admin@cinema.local / Admin123!");
+console.log("Customer demo login: customer@cinema.local / Customer123!");
 process.exit(0);

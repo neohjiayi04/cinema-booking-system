@@ -60,6 +60,8 @@ export default function MovieDetails() {
     let cancelled = false;
     let socket;
     setSeatLoading(true);
+    setShowtimeDetails(null);
+    setBookedSeats([]);
     setError("");
     setSelectedSeats([]);
     setResumeReady(false);
@@ -220,8 +222,16 @@ export default function MovieDetails() {
         </div>
         {!selectedShowtimeId ? <p className="combined-empty">Choose a showtime above to see its seating plan.</p> : seatLoading || !showtimeDetails ? <p className="combined-empty">Loading the seating plan…</p> : (
           <>
-            <div className="combined-selected-screening"><strong>{showtimeDetails.hall?.name || "Cinema Hall"}</strong><span>{showtimeDetails.date} · {showtimeDetails.startTime}</span></div>
-            <div className="combined-seat-map"><SeatMap rows={showtimeDetails.hall.rows} seatsPerRow={showtimeDetails.hall.seatsPerRow} bookedSeats={bookedSeats} selectedSeats={selectedSeats} onToggle={toggleSeat} /></div>
+            {!showtimeDetails.hall || !Number(showtimeDetails.hall.rows) || !Number(showtimeDetails.hall.seatsPerRow) ? (
+              <p className="combined-empty combined-error" role="alert">
+                Hall seating information is unavailable for this showtime. Please choose another showtime or contact the cinema administrator.
+              </p>
+            ) : (
+              <>
+                <div className="combined-selected-screening"><strong>{showtimeDetails.hall.name || "Cinema Hall"}</strong><span>{showtimeDetails.date} · {showtimeDetails.startTime}</span></div>
+                <div className="combined-seat-map"><SeatMap rows={Number(showtimeDetails.hall.rows)} seatsPerRow={Number(showtimeDetails.hall.seatsPerRow)} bookedSeats={bookedSeats} selectedSeats={selectedSeats} onToggle={toggleSeat} /></div>
+              </>
+            )}
           </>
         )}
       </section>
@@ -229,7 +239,7 @@ export default function MovieDetails() {
       {error && <div className="combined-error-banner" role="alert">{error}</div>}
 
       <section className="combined-checkout">
-        <div className="combined-checkout-seats"><span className="combined-eyebrow">YOUR SELECTION</span><strong>{showtimeDetails.hall?.name || "Cinema Hall"} - {selectedSeats.length ? selectedSeats.join(", ") : "No seats selected"}</strong><small> {selectedSeats.length} {selectedSeats.length === 1 ? "seat" : "seats"} · No payment required</small></div>
+        <div className="combined-checkout-seats"><span className="combined-eyebrow">YOUR SELECTION</span><strong>{showtimeDetails?.hall?.name || "Cinema Hall"} - {selectedSeats.length ? selectedSeats.join(", ") : "No seats selected"}</strong><small> {selectedSeats.length} {selectedSeats.length === 1 ? "seat" : "seats"} · No payment required</small></div>
         <div className="combined-checkout-total"><span>Total</span><strong>RM {total.toFixed(2)}</strong></div>
         <button className="combined-confirm-button" onClick={confirmBooking} disabled={!selectedShowtimeId || !selectedSeats.length || seatLoading || isSubmitting}>
           {isSubmitting ? "Creating booking…" : user ? "Confirm Booking →" : "Login to Confirm →"}

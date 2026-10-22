@@ -3,20 +3,19 @@
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  color: #64748b;
+  color: #002b66;
   font-size: 0.85rem;
   font-weight: 500;
   text-decoration: none;
   margin-bottom: 1.5rem;
   padding: 0.35rem 0.75rem;
   border-radius: 9999px;
-  background: #f8fafc;
   transition: all 0.2s ease;
 }
 
 .combined-back-link:hover {
   color: #1c5ff0;
-  transform: translateX(-2px);
+  transform: translateX(-3px);
 }
 
 /* Movie Hero */
