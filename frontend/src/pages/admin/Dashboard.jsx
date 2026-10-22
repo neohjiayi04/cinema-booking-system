@@ -255,7 +255,7 @@ export default function AdminDashboard() {
       <section className="admin-panel">
         <div className="admin-panel-header">
           <div>
-            <h2 className="admin-panel-title">
+            <h2 className="admin-section-title">
               Recent Bookings
             </h2>
             <p className="admin-panel-subtitle">

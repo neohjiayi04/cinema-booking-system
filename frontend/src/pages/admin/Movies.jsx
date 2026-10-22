@@ -49,12 +49,14 @@ export default function Movies() {
   });
 
   return (
-    <section className="admin-movies-container">
+    <section>
       <div className="admin-page-header">
-        <h1>Movies Management</h1>
-        <p className="admin-page-description">
-          Add new movies to your cinema or browse and manage existing ones.
-        </p>
+        <div>
+          <h1>Movies</h1>
+          <p className="admin-page-description">
+            Add new movies to your cinema or browse and manage existing ones.
+          </p>
+        </div>
       </div>
 
       {/* SECTION 1: ADD / EDIT MOVIE */}

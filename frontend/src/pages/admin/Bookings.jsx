@@ -36,7 +36,7 @@ export default function Bookings() {
       <div className="admin-panel">
         <div className="admin-panel-header">
           <div>
-            <h2 className="admin-panel-title">All Bookings</h2>
+            <h2 className="admin-section-title">All Bookings</h2>
             <p className="admin-panel-subtitle">
               {loading
                 ? "Loading..."

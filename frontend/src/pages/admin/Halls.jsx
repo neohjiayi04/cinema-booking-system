@@ -151,7 +151,7 @@ export default function Halls() {
       <div className="admin-panel" ref={formRef}>
         <div className="admin-panel-header">
           <div>
-            <h2 className="admin-panel-title">
+            <h2 className="admin-section-title">
               {isEditing ? "Edit Hall" : "Add New Hall"}
             </h2>
             <p className="admin-panel-subtitle">
@@ -216,23 +216,24 @@ export default function Halls() {
             </div>
 
             <div className="admin-form-actions">
-              {isEditing && (
-                <button
+              <button
                 type="submit"
                 className="admin-btn admin-btn-primary"
                 disabled={saving}
+              >
+                {saving ? "Saving..." : isEditing ? "Save Changes" : "+ Add Hall"}
+              </button>
+
+              {isEditing && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-secondary"
+                  onClick={resetForm}
+                  disabled={saving}
                 >
-                  {saving ? "Saving..." : isEditing ? "Save Changes" : "+ Add Hall"}
+                  Cancel
                 </button>
               )}
-                <button
-                    type="button"
-                    className="admin-btn admin-btn-secondary"
-                    onClick={resetForm}
-                    disabled={saving}
-                  >
-                    Cancel
-                  </button>
             </div>
           </form>
         </div>
@@ -242,7 +243,7 @@ export default function Halls() {
       <div className="admin-panel">
         <div className="admin-panel-header">
           <div>
-            <h2 className="admin-panel-title">All Halls</h2>
+            <h2 className="admin-section-title">All Halls</h2>
             <p className="admin-panel-subtitle">
               {halls.length} {halls.length === 1 ? "hall" : "halls"} configured
             </p>

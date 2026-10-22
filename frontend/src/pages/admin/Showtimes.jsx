@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { api } from "../../services/api.js";
 
@@ -17,7 +16,10 @@ export default function Showtimes() {
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const isEditing = Boolean(editingId);
 
   async function load() {
     const [m, h, s] = await Promise.all([
@@ -38,7 +40,9 @@ export default function Showtimes() {
   }
 
   useEffect(() => {
-    load().catch((err) => setError(err.message || "Failed to load showtimes."));
+    load()
+      .catch((err) => setError(err.message || "Failed to load showtimes."))
+      .finally(() => setLoading(false));
   }, []);
 
   function handleChange(e) {
@@ -139,118 +143,211 @@ export default function Showtimes() {
       </div>
 
       {error && (
-        <p role="alert" className="admin-error">
+        <div role="alert" className="admin-alert admin-alert-error">
           {error}
-        </p>
+        </div>
       )}
 
-      <form className="admin-form" onSubmit={submit}>
-        <select
-          name="movieId"
-          value={form.movieId}
-          onChange={handleChange}
-          required
-        >
-          <option value="" disabled>Select movie</option>
-          {movies.map((m) => (
-            <option key={m._id} value={m._id}>
-              {m.title}
-            </option>
-          ))}
-        </select>
-
-        <select
-          name="hallId"
-          value={form.hallId}
-          onChange={handleChange}
-          required
-        >
-          <option value="" disabled>Select hall</option>
-          {halls.map((h) => (
-            <option key={h._id} value={h._id}>
-              {h.name}
-            </option>
-          ))}
-        </select>
-
-        <input
-          type="date"
-          name="date"
-          value={form.date}
-          onChange={handleChange}
-          required
-        />
-
-        <input
-          type="time"
-          name="startTime"
-          value={form.startTime}
-          onChange={handleChange}
-          required
-        />
-
-        <input
-          type="number"
-          name="price"
-          min="0"
-          step="0.01"
-          value={form.price}
-          onChange={handleChange}
-          required
-        />
-
-        <div className="showtime-form-actions">
-          <button className="button" type="submit" disabled={saving}>
-            {saving
-              ? "Saving..."
-              : editingId
-                ? "Update Showtime"
-                : "Create Showtime"}
-          </button>
-
-          {editingId && (
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={cancelEdit}
-              disabled={saving}
-            >
-              Cancel
-            </button>
-          )}
-        </div>
-      </form>
-
-      <div className="table">
-        {showtimes.map((s) => (
-          <div className="table-row" key={s._id}>
-            <strong>{s.movie?.title || "Unknown movie"}</strong>
-            <span>{String(s.date).slice(0, 10)} · {s.startTime}</span>
-            <span>{s.hall?.name || "Unknown hall"}</span>
-            <span>RM {Number(s.price).toFixed(2)}</span>
-
-            <div className="showtime-row-actions">
-              <button
-                type="button"
-                className="button button-secondary"
-                onClick={() => editShowtime(s)}
-              >
-                Edit
-              </button>
-
-              <button
-                type="button"
-                className="button button-danger"
-                onClick={() => remove(s._id)}
-              >
-                Delete
-              </button>
-            </div>
+      {/* Add / Edit form */}
+      <div className="admin-panel">
+        <div className="admin-panel-header">
+          <div>
+            <h2 className="admin-section-title">
+              {isEditing ? "Edit Showtime" : "Add New Showtime"}
+            </h2>
+            <p className="admin-panel-subtitle">
+              {isEditing
+                ? "Update the showtime details, then save your changes."
+                : "Pick a movie, hall, date, time and ticket price."}
+            </p>
           </div>
-        ))}
+        </div>
 
-        {showtimes.length === 0 && (
-          <p>No showtimes available. Create your first showtime above.</p>
+        <div className="admin-panel-body">
+          <form onSubmit={submit}>
+            <div className="admin-form-grid">
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="showtime-movie">Movie</label>
+                <select
+                  id="showtime-movie"
+                  name="movieId"
+                  className="admin-select"
+                  value={form.movieId}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="" disabled>Select movie</option>
+                  {movies.map((m) => (
+                    <option key={m._id} value={m._id}>
+                      {m.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="showtime-hall">Hall</label>
+                <select
+                  id="showtime-hall"
+                  name="hallId"
+                  className="admin-select"
+                  value={form.hallId}
+                  onChange={handleChange}
+                  required
+                >
+                  <option value="" disabled>Select hall</option>
+                  {halls.map((h) => (
+                    <option key={h._id} value={h._id}>
+                      {h.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="showtime-date">Date</label>
+                <input
+                  id="showtime-date"
+                  type="date"
+                  name="date"
+                  className="admin-input"
+                  value={form.date}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="showtime-time">Start time</label>
+                <input
+                  id="showtime-time"
+                  type="time"
+                  name="startTime"
+                  className="admin-input"
+                  value={form.startTime}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="showtime-price">Price (RM)</label>
+                <input
+                  id="showtime-price"
+                  type="number"
+                  name="price"
+                  className="admin-input"
+                  min="0"
+                  step="0.01"
+                  value={form.price}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="admin-form-actions">
+              <button
+                type="submit"
+                className="admin-btn admin-btn-primary"
+                disabled={saving}
+              >
+                {saving
+                  ? "Saving..."
+                  : isEditing
+                    ? "Save Changes"
+                    : "+ Add Showtime"}
+              </button>
+
+              {isEditing && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-secondary"
+                  onClick={cancelEdit}
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {/* Showtime list */}
+      <div className="admin-panel">
+        <div className="admin-panel-header">
+          <div>
+            <h2 className="admin-section-title">All Showtimes</h2>
+            <p className="admin-panel-subtitle">
+              {loading
+                ? "Loading..."
+                : `${showtimes.length} ${showtimes.length === 1 ? "showtime" : "showtimes"} scheduled`}
+            </p>
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="admin-empty-state">
+            <p>Loading showtimes...</p>
+          </div>
+        ) : showtimes.length === 0 ? (
+          <div className="admin-empty-state">
+            <div className="admin-empty-icon" aria-hidden="true">◷</div>
+            <h3>No showtimes yet</h3>
+            <p>Create your first showtime using the form above.</p>
+          </div>
+        ) : (
+          <div className="admin-table-wrapper">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Movie</th>
+                  <th>Date</th>
+                  <th>Time</th>
+                  <th>Hall</th>
+                  <th>Price</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {showtimes.map((s) => (
+                  <tr
+                    key={s._id}
+                    className={s._id === editingId ? "is-editing" : ""}
+                  >
+                    <td className="admin-cell-primary">
+                      {s.movie?.title || "Unknown movie"}
+                    </td>
+                    <td>{String(s.date).slice(0, 10)}</td>
+                    <td>{s.startTime}</td>
+                    <td>{s.hall?.name || "Unknown hall"}</td>
+                    <td>
+                      <strong>RM {Number(s.price).toFixed(2)}</strong>
+                    </td>
+                    <td>
+                      <div className="admin-table-actions">
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn-secondary admin-btn-sm"
+                          onClick={() => editShowtime(s)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="admin-btn admin-btn-danger admin-btn-sm"
+                          onClick={() => remove(s._id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </section>
