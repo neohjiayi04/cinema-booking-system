@@ -424,6 +424,207 @@ app.get("/api/bookings/:id", requireAuth, async (req, res) => {
   res.json(booking);
 });
 
+/* ---------------- UPDATE BOOKING SEATS ---------------- */
+app.put("/api/bookings/:id", requireAuth, async (req, res) => {
+  try {
+    const bookingId = id(req.params.id);
+    const userId = id(req.user.id);
+    const { seats } = req.body;
+
+    if (!Array.isArray(seats) || seats.length === 0) {
+      return res.status(400).json({
+        message: "Please select at least one seat."
+      });
+    }
+
+    const uniqueSeats = [...new Set(
+      seats.map(seat => String(seat).trim().toUpperCase())
+    )];
+
+    if (uniqueSeats.length !== seats.length) {
+      return res.status(400).json({
+        message: "Duplicate seats are not allowed."
+      });
+    }
+
+    const bookings = getDb().collection("bookings");
+
+    const booking = await bookings.findOne({
+      _id: bookingId,
+      userId
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        message: "Booking not found or you do not have permission to modify it."
+      });
+    }
+
+    if (booking.status !== "CONFIRMED") {
+      return res.status(400).json({
+        message: "Only confirmed bookings can be modified."
+      });
+    }
+
+    const showtime = await getDb().collection("showtimes").findOne({
+      _id: booking.showtimeId
+    });
+
+    if (!showtime) {
+      return res.status(404).json({ message: "Showtime not found." });
+    }
+
+    const hall = await getDb().collection("halls").findOne({
+      _id: showtime.hallId
+    });
+
+    if (!hall) {
+      return res.status(404).json({ message: "Hall not found." });
+    }
+
+    const validSeats = new Set();
+
+    for (let r = 0; r < hall.rows; r++) {
+      const row = String.fromCharCode(65 + r);
+
+      for (let s = 1; s <= hall.seatsPerRow; s++) {
+        validSeats.add(`${row}${String(s).padStart(2, "0")}`);
+      }
+    }
+
+    if (uniqueSeats.some(seat => !validSeats.has(seat))) {
+      return res.status(400).json({
+        message: "One or more selected seats are invalid."
+      });
+    }
+
+    // Find seats held by other confirmed bookings for this showtime.
+    const otherBookings = await bookings.find({
+      showtimeId: booking.showtimeId,
+      status: "CONFIRMED",
+      _id: { $ne: booking._id }
+    }).toArray();
+
+    const occupiedSeats = new Set(
+      otherBookings.flatMap(item => item.seats || [])
+    );
+
+    const unavailable = uniqueSeats.filter(seat =>
+      occupiedSeats.has(seat)
+    );
+
+    if (unavailable.length > 0) {
+      return res.status(409).json({
+        message: `These seats are already booked: ${unavailable.join(", ")}.`
+      });
+    }
+
+    const result = await bookings.updateOne(
+      {
+        _id: booking._id,
+        userId,
+        status: "CONFIRMED",
+        seats: booking.seats
+      },
+      {
+        $set: {
+          seats: uniqueSeats,
+          totalAmount: uniqueSeats.length * Number(showtime.price),
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(409).json({
+        message: "The booking changed while you were editing it. Please refresh and try again."
+      });
+    }
+
+    // Tell connected seat maps to refresh availability.
+    broadcastToShowtime(String(booking.showtimeId), {
+      type: "SEATS_UPDATED",
+      showtimeId: String(booking.showtimeId),
+      seats: [...new Set([...(booking.seats || []), ...uniqueSeats])]
+    });
+
+    const updatedBooking = await bookings.findOne({
+      _id: booking._id
+    });
+
+    res.json(updatedBooking);
+  } catch (error) {
+    console.error("Update booking error:", error);
+    res.status(500).json({
+      message: "Failed to update booking seats."
+    });
+  }
+});
+
+/* ---------------- CANCEL BOOKING ---------------- */
+app.delete("/api/bookings/:id", requireAuth, async (req, res) => {
+  try {
+    const bookingId = id(req.params.id);
+    const userId = id(req.user.id);
+    const bookings = getDb().collection("bookings");
+
+    const booking = await bookings.findOne({
+      _id: bookingId,
+      userId
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        message: "Booking not found or you do not have permission to cancel it."
+      });
+    }
+
+    if (booking.status !== "CONFIRMED") {
+      return res.status(400).json({
+        message: "This booking has already been cancelled or is no longer active."
+      });
+    }
+
+    const result = await bookings.updateOne(
+      {
+        _id: booking._id,
+        userId,
+        status: "CONFIRMED"
+      },
+      {
+        $set: {
+          status: "CANCELLED",
+          cancelledAt: new Date()
+        }
+      }
+    );
+
+    if (result.modifiedCount === 0) {
+      return res.status(409).json({
+        message: "This booking has already changed. Please refresh your bookings."
+      });
+    }
+
+    broadcastToShowtime(String(booking.showtimeId), {
+      type: "SEATS_RELEASED",
+      showtimeId: String(booking.showtimeId),
+      seats: booking.seats || []
+    });
+
+    res.json({
+      message: "Booking cancelled successfully.",
+      bookingId: String(booking._id),
+      status: "CANCELLED"
+    });
+  } catch (error) {
+    console.error("Cancel booking error:", error);
+    res.status(500).json({
+      message: "Failed to cancel booking."
+    });
+  }
+});
+
+
 // ---------------- HTTP + WEBSOCKET ----------------
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });

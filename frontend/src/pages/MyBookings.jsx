@@ -22,7 +22,7 @@ export default function MyBookings() {
         await api(`/bookings/${id}`, { method: "DELETE" });
         setBookings(bookings.filter((b) => b._id !== id));
       } catch (err) {
-        alert("Failed to cancel booking.");
+        alert(err.message || "Failed to cancel booking.");
       }
     }
   };
@@ -44,7 +44,7 @@ export default function MyBookings() {
       setBookings(bookings.map((b) => (b._id === id ? response : b)));
       setEditingBooking(null);
     } catch (err) {
-      alert("Failed to update seats.");
+      alert(err.message || "Failed to update seats.");
     }
   };
 
