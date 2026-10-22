@@ -22,6 +22,7 @@ export default function Register() {
   }
 
   return (
+  <div className="auth-page-wrapper">
     <section className="auth-card">
       <h1>Create Account</h1>
       <p>Register as a cinema customer.</p>
@@ -34,5 +35,6 @@ export default function Register() {
       </form>
       <p>Already registered? <Link to={`/login${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}>Login</Link></p>
     </section>
+  </div>
   );
 }

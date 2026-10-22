@@ -1,67 +1,36 @@
-# Cinema Booking System — Version 1
+Before closing your laptop
+1. Make sure your work is saved
 
-Stack:
-- React + Vite + JavaScript
-- Node.js + Express
-- Native WebSocket (`ws`)
-- MongoDB
-- Docker Compose
-- JWT + bcryptjs
+Save your code in VS Code (Ctrl + S). If you have unsaved changes, save them first.
 
-## Run
 
-```bash
-docker compose up -d --build
-```
 
-Open:
+2. Stop your Docker containers
 
-- Frontend: http://localhost:5173
-- Backend health: http://localhost:3000/api/health
+Open PowerShell in your project folder and run:
+docker compose stop
 
-## Seed data
 
-After the containers are running:
+This stops the frontend, backend, and MongoDB containers without deleting them or their stored database data.
 
-```bash
-docker compose exec backend npm run seed
-```
 
-Seeded accounts:
 
-- Admin: admin@cinema.local / Admin123!
-- Customer: customer@cinema.local / Customer123!
+3. Close your applications
 
-## Multi-computer test
+You can close VS Code, PowerShell, your browser, and MongoDB Compass, then shut down or close your laptop.
 
-Run Docker on one computer connected to the same LAN.
 
-Find that computer's LAN IP, for example `192.168.1.100`.
 
-On another computer, open:
-
-`http://192.168.1.100:5173`
-
-For the current Docker setup, if the frontend is accessed from another computer, set these in `docker-compose.yml`:
-
-```yaml
-VITE_API_URL: http://192.168.1.100:3000/api
-VITE_WS_URL: ws://192.168.1.100:3000
-```
-
-Then rebuild:
-
-```bash
-docker compose up --build
-```
-
-Open the same showtime on two computers. Book a seat on Computer A and Computer B should receive a real-time `SEAT_BOOKED` WebSocket event.
-
-## Important
-
-This is a Version 1 foundation. It intentionally uses a simple booking rule:
-- selecting a seat selects it locally
-- clicking Confirm Booking creates the booking immediately
-- there is no payment
-- there is no temporary 5-minute hold
-
+When you want to use your system again
+1. Open Docker Desktop and wait until it is running.
+2. Open PowerShell and navigate to your project folder:
+   cd "C:\Users\neohj\OneDrive\Documents\fullstack\cinema-booking-system"
+3. Start your system:
+   docker compose start
+4. Open your browser at http://localhost:5173.
+Your existing movies, showtimes, halls, users, and bookings should remain in the database.
+Important things to remember
+- Don't run docker compose down -v just to stop your system. The -v option can delete the database volume and its stored data.
+- You don't need to manually stop MongoDB separately when it is running inside Docker.
+- If you have changed your code or Docker configuration, you may need to rebuild the relevant container instead of simply running docker compose start.
+- If you want to close your laptop temporarily and keep everything running, sleep mode may pause or interrupt the services. Stopping the containers first is the safer, cleaner option.
