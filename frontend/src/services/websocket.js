@@ -14,8 +14,7 @@ export function connectShowtime(showtimeId, onMessage) {
     try {
       onMessage(JSON.parse(event.data));
     } catch (error) {
-  // Handle or intentionally ignore this specific error.
-    }
+        console.error("WebSocket error:", error);    }
   });
 
   return socket;
