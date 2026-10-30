@@ -5,8 +5,8 @@ COPY package*.json ./
 RUN npm ci
 COPY . .
 # Vite bakes these in at build time. Change defaults to your deployed URLs.
-ARG VITE_API_URL=http://localhost:5173/api
-ARG VITE_WS_URL=ws://localhost:5173
+ARG VITE_API_URL=http://localhost:3000/api
+ARG VITE_WS_URL=ws://localhost:3000
 ENV VITE_API_URL=$VITE_API_URL VITE_WS_URL=$VITE_WS_URL
 RUN npm run build
 
