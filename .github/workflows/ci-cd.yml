@@ -36,11 +36,6 @@ jobs:
     defaults:
       run:
         working-directory: backend
-    services:
-      mongodb:
-        image: mongo:8
-        ports:
-          - 27017:27017
     env:
       MONGO_URI: mongodb://127.0.0.1:27017/cinema_booking
       DB_NAME: cinema_booking
@@ -56,19 +51,21 @@ jobs:
       - run: npm ci
       - name: Syntax check
         run: for f in src/*.js; do node --check "$f"; done
+      - name: Start MongoDB
+        working-directory: .
+        run: docker run -d --name mongo -p 27017:27017 mongo:8
       - name: Wait for MongoDB
+        working-directory: .
         run: |
-          CID=$(docker ps -q --filter ancestor=mongo:8 | head -n 1)
-          echo "MongoDB container: $CID"
           for i in $(seq 1 30); do
-            if docker exec "$CID" mongosh --quiet --eval "db.runCommand({ping:1}).ok" 2>/dev/null | grep -q 1; then
+            if docker exec mongo mongosh --quiet --eval "db.runCommand({ping:1}).ok" 2>/dev/null | grep -q 1; then
               echo "MongoDB is ready"
               exit 0
             fi
             sleep 2
           done
           echo "MongoDB did not become ready"
-          docker logs "$CID" 2>&1 | tail -30
+          docker logs mongo 2>&1 | tail -30
           exit 1
       - name: Start server and hit /api/health
         run: |
@@ -91,7 +88,8 @@ jobs:
           exit 1
       - name: Show MongoDB logs on failure
         if: failure()
-        run: docker logs "$(docker ps -aq --filter ancestor=mongo:8 | head -n 1)" 2>&1 | tail -50
+        working-directory: .
+        run: docker logs mongo 2>&1 | tail -50
 
   # ---------- CD: publish Docker images ----------
   publish:
