@@ -359,40 +359,78 @@ function generateReference() {
 app.post("/api/bookings", requireAuth, async (req, res) => {
   try {
     const { showtimeId, seats } = req.body;
+
     if (!showtimeId || !Array.isArray(seats) || seats.length === 0) {
-      return res.status(400).json({ message: "Showtime and at least one seat are required" });
+      return res.status(400).json({
+        message: "Showtime and at least one seat are required"
+      });
     }
 
     const uniqueSeats = [...new Set(seats)];
-    const showtime = await getDb().collection("showtimes").findOne({ _id: id(showtimeId) });
-    if (!showtime) return res.status(404).json({ message: "Showtime not found" });
 
-    const hall = await getDb().collection("halls").findOne({ _id: showtime.hallId });
-    if (!hall) return res.status(404).json({ message: "Hall not found" });
+    const showtime = await getDb()
+      .collection("showtimes")
+      .findOne({ _id: id(showtimeId) });
 
+    if (!showtime) {
+      return res.status(404).json({ message: "Showtime not found" });
+    }
+
+    const hall = await getDb()
+      .collection("halls")
+      .findOne({ _id: showtime.hallId });
+
+    if (!hall) {
+      return res.status(404).json({ message: "Hall not found" });
+    }
+
+    // Validate seats
     const validSeats = new Set();
+
     for (let r = 0; r < hall.rows; r++) {
       const row = String.fromCharCode(65 + r);
-      for (let s = 1; s <= hall.seatsPerRow; s++) validSeats.add(`${row}${String(s).padStart(2, "0")}`);
+
+      for (let s = 1; s <= hall.seatsPerRow; s++) {
+        validSeats.add(
+          `${row}${String(s).padStart(2, "0")}`
+        );
+      }
     }
 
     if (uniqueSeats.some(seat => !validSeats.has(seat))) {
-      return res.status(400).json({ message: "One or more seats are invalid" });
+      return res.status(400).json({
+        message: "One or more seats are invalid"
+      });
+    }
+
+    // Retrieve the authenticated user
+    const user = await getDb()
+      .collection("users")
+      .findOne({ _id: id(req.user.id) });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
     }
 
     const totalAmount = uniqueSeats.length * Number(showtime.price);
 
+    const bookingReference = generateReference();
+
     const booking = {
-      bookingReference: generateReference(),
+      bookingReference,
       userId: id(req.user.id),
-      showtimeId: id(showtimeId),
+      username: user.name,
+      showtimeId,
       seats: uniqueSeats,
       totalAmount,
       status: "CONFIRMED",
       createdAt: new Date()
     };
 
-    const result = await getDb().collection("bookings").insertOne(booking);
+    const result = await getDb()
+      .collection("bookings")
+      .insertOne(booking);
+
     booking._id = result.insertedId;
 
     broadcastToShowtime(showtimeId, {
@@ -408,6 +446,7 @@ app.post("/api/bookings", requireAuth, async (req, res) => {
         message: "One or more selected seats have just been booked by another customer. Please refresh the seat map."
       });
     }
+
     console.error(error);
     res.status(500).json({ message: "Booking failed" });
   }
