@@ -74,8 +74,8 @@ jobs:
 
       - name: Start MongoDB
         working-directory: .
-        run: docker run -d --name cinema-ci-mongo -p 27017:27017 mongo:8
-
+        run: docker run -d --name cinema-ci-mongo -p 27017:27017 mongo:7.0.41
+        
       - name: Wait for MongoDB
         working-directory: .
         run: |
