@@ -11,7 +11,6 @@ import {
   createToken,
   requireAuth,
   requireAdmin,
-  getUserById
 } from "./auth.js";
 
 const app = express();

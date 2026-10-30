@@ -17,5 +17,10 @@
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^7.0.0",
     "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0"
   }
 }
