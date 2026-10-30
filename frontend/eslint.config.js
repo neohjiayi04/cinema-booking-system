@@ -1,22 +1,46 @@
 import js from "@eslint/js";
 import globals from "globals";
+import react from "eslint-plugin-react";
 import reactHooks from "eslint-plugin-react-hooks";
 
 export default [
-  { ignores: ["dist"] },
+  {
+    ignores: ["dist/**", "node_modules/**"],
+  },
   js.configs.recommended,
   {
     files: ["**/*.{js,jsx}"],
     languageOptions: {
       ecmaVersion: "latest",
       sourceType: "module",
-      globals: globals.browser,
-      parserOptions: { ecmaFeatures: { jsx: true } }
+      globals: {
+        ...globals.browser,
+      },
+      parserOptions: {
+        ecmaFeatures: {
+          jsx: true,
+        },
+      },
     },
-    plugins: { "react-hooks": reactHooks },
+    plugins: {
+      react,
+      "react-hooks": reactHooks,
+    },
+    settings: {
+      react: {
+        version: "detect",
+      },
+    },
     rules: {
+      ...react.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
-      "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }]
-    }
-  }
+      "react/react-in-jsx-scope": "off",
+
+      // This project uses JavaScript without PropTypes.
+      "react/prop-types": "off",
+
+      // Allow legitimate data-fetching effects that update React state.
+      "react-hooks/set-state-in-effect": "warn",
+    },
+  },
 ];

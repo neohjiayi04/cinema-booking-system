@@ -13,7 +13,9 @@ export function connectShowtime(showtimeId, onMessage) {
   socket.addEventListener("message", event => {
     try {
       onMessage(JSON.parse(event.data));
-    } catch {}
+    } catch (error) {
+  // Handle or intentionally ignore this specific error.
+    }
   });
 
   return socket;

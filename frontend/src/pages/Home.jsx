@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo } from "react";
-import { Link } from "react-router-dom";
 import { api } from "../services/api.js";
 import MovieCard from "../components/MovieCard.jsx";
 import "../styles/Home.css";

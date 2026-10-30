@@ -37,7 +37,7 @@ export default function BookingConfirmation() {
             <span className="success-icon">✓</span>
           </div>
           <span className="eyebrow">BOOKING CONFIRMED</span>
-          <h1>You're all set!</h1>
+          <h1>You are all set!</h1>
           <p className="subtext">
             Your booking reference is{" "}
             <button className="copy-ref-btn" onClick={handleCopy} title="Click to copy">

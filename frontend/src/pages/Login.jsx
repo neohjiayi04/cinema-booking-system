@@ -33,7 +33,7 @@ export default function Login() {
         {error && <p className="error">{error}</p>}
         <button className="button full">Login</button>
       </form>
-      <p>Don't have an account? <Link to={`/register${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}>Register</Link></p>
+      <p>Don&apos;t have an account? <Link to={`/register${returnTo !== "/" ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`}>Register</Link></p>
     </section>
    </div>
   );

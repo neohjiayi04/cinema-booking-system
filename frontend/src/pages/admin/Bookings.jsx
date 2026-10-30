@@ -52,7 +52,7 @@ export default function Bookings() {
         ) : error ? (
           <div className="admin-empty-state">
             <div className="admin-empty-icon" aria-hidden="true">!</div>
-            <h3>Couldn't load bookings</h3>
+            <h3>Could not load bookings</h3>
             <p>{error}</p>
             <button
               type="button"

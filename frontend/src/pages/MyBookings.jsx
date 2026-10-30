@@ -6,14 +6,14 @@ export default function MyBookings() {
   const [bookings, setBookings] = useState([]);
   const [editingBooking, setEditingBooking] = useState(null);
   const [newSeats, setNewSeats] = useState("");
-
-  useEffect(() => {
-    fetchBookings();
-  }, []);
-
+  
   const fetchBookings = () => {
     api("/bookings/my").then(setBookings);
   };
+  
+  useEffect(() => {
+    fetchBookings();
+  }, []);
 
   // DELETE operation
   const handleDelete = async (id) => {
