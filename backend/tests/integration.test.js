@@ -20,6 +20,7 @@ const hallId = new ObjectId();
 const showtimeId = new ObjectId();
 
 let customerToken;
+let bookingId;
 
 before(async () => {
   await connectDb();
@@ -161,9 +162,39 @@ test("POST /api/bookings should create a booking for an authenticated customer",
 
   assert.ok(response.body.bookingReference);
   assert.ok(response.body._id);
+  bookingId = response.body._id;
 });
 
-// Test 7: Reject Invalid Seats
+// Test 7: Retrieve Booking Details
+test("GET /api/bookings/:id should return booking details", async () => {
+  const response = await request(app)
+    .get(`/api/bookings/${bookingId}`)
+    .set("Authorization", `Bearer ${customerToken}`)
+    .expect(200);
+
+  assert.equal(response.body._id, bookingId);
+  assert.deepEqual(response.body.seats, ["A01", "A02"]);
+  assert.equal(response.body.totalAmount, 36);
+});
+
+// Test 8: Retrieve Customer Booking History
+test("GET /api/bookings/my should return the customer's bookings", async () => {
+  const response = await request(app)
+    .get("/api/bookings/my")
+    .set("Authorization", `Bearer ${customerToken}`)
+    .expect(200);
+
+  assert.ok(Array.isArray(response.body));
+
+  const booking = response.body.find(
+    item => item._id === bookingId
+  );
+
+  assert.ok(booking);
+  assert.deepEqual(booking.seats, ["A01", "A02"]);
+});
+
+// Test 9: Reject Invalid Seats
 test("POST /api/bookings should reject invalid seats", async () => {
   const response = await request(app)
     .post("/api/bookings")
@@ -177,7 +208,7 @@ test("POST /api/bookings should reject invalid seats", async () => {
   assert.match(response.body.message, /invalid/i);
 });
 
-// Test 8: Reject Unauthenticated Booking
+// Test 10: Reject Unauthenticated Booking
 test("POST /api/bookings should reject requests without authentication", async () => {
   await request(app)
     .post("/api/bookings")
