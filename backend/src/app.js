@@ -572,7 +572,7 @@ app.post("/api/bookings", requireAuth, async (req, res) => {
       bookingReference: generateReference(),
       userId: id(req.user.id),
       username: user.name,
-      showtimeId,
+      showtimeId: id(showtimeId), 
       seats: uniqueSeats,
       totalAmount,
       status: "CONFIRMED",
