@@ -218,3 +218,64 @@ test("POST /api/bookings should reject requests without authentication", async (
     })
     .expect(401);
 });
+
+//Test 11:Update Booking Seats
+test("PUT /api/bookings/:id should update booking seats", async()=>{
+    const response = await request (app)
+    .put(`/api/bookings/${bookingId}`)
+    .set("Authorization", `Bearer ${customerToken}`)
+    .send({
+      seats: ["A03", "A04"]
+    })
+    .expect(200);
+
+    assert.deepEqual(response.body.seats, ["A03", "A04"]);
+    assert.equal(response.body.totalAmount, 36);
+})
+
+// Test 12: Reject Invalid Seats During Booking Update
+test("PUT /api/bookings/:id should reject invalid seats", async () => {
+  const response = await request(app)
+    .put(`/api/bookings/${bookingId}`)
+    .set("Authorization", `Bearer ${customerToken}`)
+    .send({
+      seats: ["Z99"]
+    })
+    .expect(400);
+
+  assert.match(response.body.message, /invalid/i);
+});
+
+// Test 13: Reject Unauthenticated Booking Update
+test("PUT /api/bookings/:id should reject unauthenticated requests", async () => {
+  await request(app)
+    .put(`/api/bookings/${bookingId}`)
+    .send({
+      seats: ["A01", "A02"]
+    })
+    .expect(401);
+});
+
+// Test 14: Cancel Booking
+test("DELETE /api/bookings/:id should cancel a booking", async () => {
+  const response = await request(app)
+    .delete(`/api/bookings/${bookingId}`)
+    .set("Authorization", `Bearer ${customerToken}`)
+    .expect(200);
+
+  assert.equal(response.body.status, "CANCELLED");
+  assert.equal(response.body.bookingId, bookingId);
+});
+
+// Test 15: Reject Updating a Cancelled Booking
+test("PUT /api/bookings/:id should reject updates to cancelled bookings", async () => {
+  const response = await request(app)
+    .put(`/api/bookings/${bookingId}`)
+    .set("Authorization", `Bearer ${customerToken}`)
+    .send({
+      seats: ["A01", "A02"]
+    })
+    .expect(400);
+
+  assert.ok(response.body.message);
+});
