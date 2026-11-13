@@ -9,6 +9,11 @@ const initialForm = {
   price: 18,
 };
 
+// Fetches everything the page needs. Lives outside the component so the
+// mount effect can call it without adding dependencies.
+const fetchAll = () =>
+  Promise.all([api("/movies"), api("/halls"), api("/showtimes")]);
+
 export default function Showtimes() {
   const [movies, setMovies] = useState([]);
   const [halls, setHalls] = useState([]);
@@ -21,12 +26,9 @@ export default function Showtimes() {
 
   const isEditing = Boolean(editingId);
 
+  // Used to refresh the data after save / delete
   async function load() {
-    const [m, h, s] = await Promise.all([
-      api("/movies"),
-      api("/halls"),
-      api("/showtimes"),
-    ]);
+    const [m, h, s] = await fetchAll();
 
     setMovies(m);
     setHalls(h);
@@ -39,10 +41,28 @@ export default function Showtimes() {
     }));
   }
 
+  // Initial load: setState only runs inside the .then callback
   useEffect(() => {
-    load()
-      .catch((err) => setError(err.message || "Failed to load showtimes."))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    fetchAll()
+      .then(([m, h, s]) => {
+        if (cancelled) return;
+        setMovies(m);
+        setHalls(h);
+        setShowtimes(s);
+        setForm((f) => ({
+          ...f,
+          movieId: f.movieId || m[0]?._id || "",
+          hallId: f.hallId || h[0]?._id || "",
+        }));
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || "Failed to load showtimes.");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   function handleChange(e) {

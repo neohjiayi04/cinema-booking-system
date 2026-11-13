@@ -7,28 +7,44 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [open, setOpen] = useState(false);
+
+  const [menuState, setMenuState] = useState({
+  pathname: location.pathname,
+  open: false
+});
+
+  const open =
+    menuState.pathname === location.pathname && menuState.open;
+
+  function setOpen(value) {
+    setMenuState({
+      pathname: location.pathname,
+      open: typeof value === "function" ? value(open) : value
+    });
+  }
   const headerRef = useRef(null);
 
   const isAdmin = user?.role === "admin";
-
-  // Close the mobile menu whenever the page changes
-  useEffect(() => {
-    setOpen(false);
-  }, [location.pathname]);
 
   // Close on outside click or Escape while the menu is open
   useEffect(() => {
     if (!open) return undefined;
 
+    function closeMenu() {
+      setMenuState({
+        pathname: location.pathname,
+        open: false
+      });
+    }
+
     function handlePointerDown(event) {
       if (headerRef.current && !headerRef.current.contains(event.target)) {
-        setOpen(false);
+        closeMenu();
       }
     }
 
     function handleKeyDown(event) {
-      if (event.key === "Escape") setOpen(false);
+      if (event.key === "Escape") closeMenu();
     }
 
     document.addEventListener("pointerdown", handlePointerDown);
@@ -38,7 +54,7 @@ export default function Navbar() {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [open]);
+  }, [open, location.pathname]);
 
   function handleLogout() {
     setOpen(false);

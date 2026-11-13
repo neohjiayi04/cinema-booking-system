@@ -25,7 +25,23 @@ export default function Home() {
   };
 
   useEffect(() => {
-    fetchMovies();
+    let isActive = true;
+
+    api("/movies")
+      .then((data) => {
+        if (!isActive) return;
+        setMovies(data || []);
+        setLoading(false);
+      })
+      .catch((e) => {
+        if (!isActive) return;
+        setError(e.message || "Unable to load movies. Please try again.");
+        setLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   // Dynamically extract unique genres from movies

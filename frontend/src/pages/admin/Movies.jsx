@@ -13,7 +13,14 @@ export default function Movies() {
   const [selectedGenre, setSelectedGenre] = useState("All");
 
   async function load() { setMovies(await api("/movies")); }
-  useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    api("/movies").then((data) => {
+      if (!cancelled) setMovies(data);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   async function submit(e) {
     e.preventDefault();

@@ -8,8 +8,19 @@ import "../styles/MovieDetails.css";
 
 const PENDING_KEY = "cinemax.pendingBooking";
 
-export default function MovieDetails() {
-  const { id: movieId } = useParams();
+function readPendingBooking() {
+  try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"); }
+  catch { return null; }
+}
+
+// Wrapper: key={id} remounts the page with fresh state whenever the movie changes,
+// so we don't need to reset state manually inside an effect.
+export default function MovieDetailsPage() {
+  const { id } = useParams();
+  return <MovieDetails key={id} movieId={id} />;
+}
+
+function MovieDetails({ movieId }) {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -29,52 +40,38 @@ export default function MovieDetails() {
   const [resumeReady, setResumeReady] = useState(false);
   const resumedRef = useRef(false);
 
+  // Load movie + showtimes (runs once per mount; remounts when movieId changes)
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     Promise.all([api(`/movies/${movieId}`), api(`/showtimes?movieId=${movieId}`)])
       .then(([movieData, showtimeData]) => {
         if (cancelled) return;
         setMovie(movieData);
         setShowtimes(showtimeData || []);
-        const saved = (() => {
-          try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"); }
-          catch { return null; }
-        })();
+        const saved = readPendingBooking();
         const savedShowtime = saved?.movieId === movieId ? saved.showtimeId : "";
-        setSelectedShowtimeId(savedShowtime || showtimeData?.[0]?._id || "");
+        const initialId = savedShowtime || showtimeData?.[0]?._id || "";
+        setSelectedShowtimeId(initialId);
+        setSeatLoading(Boolean(initialId));
       })
       .catch((e) => !cancelled && setError(e.message || "Unable to load movie details."))
       .finally(() => !cancelled && setLoading(false));
     return () => { cancelled = true; };
   }, [movieId]);
 
+  // Load seats + live updates for the selected showtime.
+  // All synchronous resets happen in selectShowtime(), so this effect only does async work.
   useEffect(() => {
-    if (!selectedShowtimeId) {
-      setShowtimeDetails(null);
-      setBookedSeats([]);
-      setSelectedSeats([]);
-      return;
-    }
+    if (!selectedShowtimeId) return undefined;
 
     let cancelled = false;
-    let socket;
-    setSeatLoading(true);
-    setShowtimeDetails(null);
-    setBookedSeats([]);
-    setError("");
-    setSelectedSeats([]);
-    setResumeReady(false);
 
     api(`/showtimes/${selectedShowtimeId}`)
       .then((data) => {
         if (cancelled) return;
         setShowtimeDetails(data);
         setBookedSeats(data.bookedSeats || []);
-        const saved = (() => {
-          try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"); }
-          catch { return null; }
-        })();
+        const saved = readPendingBooking();
         if (saved?.movieId === movieId && saved?.showtimeId === selectedShowtimeId && Array.isArray(saved.seats)) {
           const stillAvailable = saved.seats.filter((seat) => !(data.bookedSeats || []).includes(seat));
           setSelectedSeats(stillAvailable);
@@ -88,7 +85,7 @@ export default function MovieDetails() {
       .catch((e) => !cancelled && setError(e.message || "Unable to load seats."))
       .finally(() => !cancelled && setSeatLoading(false));
 
-    socket = connectShowtime(selectedShowtimeId, (message) => {
+    const socket = connectShowtime(selectedShowtimeId, (message) => {
       if (message.type === "CONNECTED" || message.type === "JOINED_SHOWTIME") setConnected(true);
       if (message.type === "SEAT_BOOKED") {
         setBookedSeats((previous) => [...new Set([...previous, ...(message.seats || [])])]);
@@ -122,16 +119,28 @@ export default function MovieDetails() {
     }
   }, [isSubmitting, navigate]);
 
+  // Auto-submit the pending booking after returning from the login page.
   useEffect(() => {
     if (!resumeBooking || !user || !resumeReady || !showtimeDetails || !selectedSeats.length || resumedRef.current || isSubmitting) return;
-    const saved = (() => {
-      try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"); }
-      catch { return null; }
-    })();
+    const saved = readPendingBooking();
     if (saved?.movieId !== movieId || saved?.showtimeId !== selectedShowtimeId) return;
     resumedRef.current = true;
+    // Intentional: createBooking is async; this is a one-time "resume after login" flow.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     createBooking(selectedShowtimeId, selectedSeats);
   }, [resumeBooking, user, resumeReady, showtimeDetails, selectedSeats, movieId, selectedShowtimeId, isSubmitting, createBooking]);
+
+  function selectShowtime(id) {
+    if (id === selectedShowtimeId) return;
+    setSelectedShowtimeId(id);
+    setShowtimeDetails(null);
+    setBookedSeats([]);
+    setSelectedSeats([]);
+    setResumeReady(false);
+    setSeatLoading(true);
+    setError("");
+    resumedRef.current = false;
+  }
 
   function toggleSeat(seat) {
     setSelectedSeats((previous) => previous.includes(seat)
@@ -186,31 +195,31 @@ export default function MovieDetails() {
         {showtimes.length ? (
           <div className="combined-showtime-grid">
             {showtimes.map((showtime) => {
-            const active = selectedShowtimeId === showtime._id;
-            return (
-              <button 
-                type="button" 
-                key={showtime._id} 
-                className={`combined-showtime ${active ? "active" : ""}`} 
-                onClick={() => { setSelectedShowtimeId(showtime._id); setError(""); resumedRef.current = false; }}
-              >
-                {/* Active Checkmark Badge */}
-                {active && <span className="combined-showtime-check">✓</span>}
+              const active = selectedShowtimeId === showtime._id;
+              return (
+                <button
+                  type="button"
+                  key={showtime._id}
+                  className={`combined-showtime ${active ? "active" : ""}`}
+                  onClick={() => selectShowtime(showtime._id)}
+                >
+                  {/* Active Checkmark Badge */}
+                  {active && <span className="combined-showtime-check">✓</span>}
 
-                {/* Date at the top */}
-                <span className="combined-showtime-date">{showtime.date}</span>
+                  {/* Date at the top */}
+                  <span className="combined-showtime-date">{showtime.date}</span>
 
-                {/* Big bold time in the middle */}
-                <strong>{showtime.startTime}</strong>
+                  {/* Big bold time in the middle */}
+                  <strong>{showtime.startTime}</strong>
 
-                {/* Hall info & Price pill container at the bottom */}
-                <div className="combined-showtime-footer">
-                  <span className="combined-showtime-hall-badge">{showtime.hall?.name || "Cinema Hall"}</span>
-                  <span className="combined-showtime-price">RM {Number(showtime.price || 0).toFixed(2)}</span>
-                </div>
-              </button>
-            );
-          })}
+                  {/* Hall info & Price pill container at the bottom */}
+                  <div className="combined-showtime-footer">
+                    <span className="combined-showtime-hall-badge">{showtime.hall?.name || "Cinema Hall"}</span>
+                    <span className="combined-showtime-price">RM {Number(showtime.price || 0).toFixed(2)}</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         ) : <p className="combined-empty">There are no showtimes available for this movie yet.</p>}
       </section>

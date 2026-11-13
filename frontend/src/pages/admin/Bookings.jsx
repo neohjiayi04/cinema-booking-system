@@ -19,7 +19,12 @@ export default function Bookings() {
   }
 
   useEffect(() => {
-    load();
+    let cancelled = false;
+    api("/bookings")
+      .then((data) => { if (!cancelled) setBookings(data); })
+      .catch((err) => { if (!cancelled) setError(err.message || "Unable to load bookings."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   return (

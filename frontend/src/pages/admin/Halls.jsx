@@ -28,7 +28,12 @@ export default function Halls() {
   }
 
   useEffect(() => {
-    load();
+    let cancelled = false;
+    api("/halls")
+      .then((data) => { if (!cancelled) setHalls(data); })
+      .catch((err) => { if (!cancelled) setError(err.message || "Unable to load halls."); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   function setField(field) {
