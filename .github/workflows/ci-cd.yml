@@ -90,7 +90,13 @@ jobs:
           echo "MongoDB failed to start"
           docker logs cinema-ci-mongo
           exit 1
-
+        
+      - name: Run backend automated tests
+        run: npm test
+      
+      - name: Run backend ESLint
+        run: npm run lint  
+      
       - name: Start backend and test health endpoint
         run: |
           node src/server.js > server.log 2>&1 &
