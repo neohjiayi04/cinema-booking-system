@@ -6,12 +6,12 @@ import { useAuth } from "./context/AuthContext.jsx";
 // Customer pages
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
-import Home from "./pages/Home.jsx";
-import MovieDetails from "./pages/MovieDetails.jsx";
-import SeatBooking from "./pages/SeatBooking.jsx";
-import BookingConfirmation from "./pages/BookingConfirmation.jsx";
-import MyBookings from "./pages/MyBookings.jsx";
-import UserProfile from "./pages/UserProfile.jsx";
+import Home from "./pages/customer/Home.jsx";
+import MovieDetails from "./pages/customer/MovieDetails.jsx";
+import SeatBooking from "./pages/customer/SeatBooking.jsx";
+import BookingConfirmation from "./pages/customer/BookingConfirmation.jsx";
+import MyBookings from "./pages/customer/MyBookings.jsx";
+import UserProfile from "./pages/customer/UserProfile.jsx";
 
 // Admin pages
 import AdminDashboard from "./pages/admin/Dashboard.jsx";

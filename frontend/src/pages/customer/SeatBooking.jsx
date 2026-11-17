@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import SeatMap from "../components/SeatMap.jsx";
-import { api } from "../services/api.js";
-import { connectShowtime } from "../services/websocket.js";
-import "../styles/SeatBooking.css";
+import SeatMap from "../../components/SeatMap.jsx";
+import { api } from "../../services/api.js";
+import { connectShowtime } from "../../services/websocket.js";
+import "../../styles/SeatBooking.css";
 
 export default function SeatBooking() {
   const { id } = useParams();

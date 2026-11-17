@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
-import { api } from "../services/api.js";
-import MovieCard from "../components/MovieCard.jsx";
-import { MOVIE_STATUS, statusOf } from "../constants/movieOptions.js";
-import "../styles/Home.css";
+import { api } from "../../services/api.js";
+import MovieCard from "../../components/MovieCard.jsx";
+import { MOVIE_STATUS, statusOf } from "../../constants/movieOptions.js";
+import "../../styles/Home.css";
 
 const TABS = [
   { key: MOVIE_STATUS.NOW_SHOWING, label: "Now Showing", empty: "No movies are showing right now." },

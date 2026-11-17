@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext.jsx";
-import { api } from "../services/api.js";
-import "../styles/UserProfile.css";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { api } from "../../services/api.js";
+import "../../styles/UserProfile.css";
 
 export default function UserProfile() {
   const { user, updateUser, logout } = useAuth();

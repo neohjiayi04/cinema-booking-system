@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { useAuth } from "../context/AuthContext.jsx";
-import SeatMap from "../components/SeatMap.jsx";
-import { api } from "../services/api.js";
-import { connectShowtime } from "../services/websocket.js";
-import { MOVIE_STATUS, MOVIE_STATUS_LABELS, statusOf, formatDate } from "../constants/movieOptions.js";
-import "../styles/MovieDetails.css";
+import { useAuth } from "../../context/AuthContext.jsx";
+import SeatMap from "../../components/SeatMap.jsx";
+import { api } from "../../services/api.js";
+import { connectShowtime } from "../../services/websocket.js";
+import { MOVIE_STATUS, MOVIE_STATUS_LABELS, statusOf, formatDate } from "../../constants/movieOptions.js";
+import "../../styles/MovieDetails.css";
 
 const PENDING_KEY = "cinemax.pendingBooking";
 
