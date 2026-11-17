@@ -10,7 +10,7 @@
     4. Main area and topbar     17. Chart containers
     5. Buttons                  18. Activity feed
     6. Stat (KPI) cards         19. Scrollbars and selection
-    7. Panels and content grid  20. Management pages (Movies, Halls, Showtimes, Bookings, Profile
+    7. Panels and content grid  20. Management pages (Movies, Halls, Showtimes, Profile
     8. Tables                   21. Accessibility and motion
     9. Status badges            22. Form control overrides
    10. Search, filters, forms   23. Profile page
@@ -1751,7 +1751,7 @@ body:has(.admin-layout) {
   background: rgba(91, 91, 240, 0.20);
 }
 
-/* 20. MANAGEMENT PAGES (Movies, Halls, Showtimes, Bookings, Profile)
+/* 20. MANAGEMENT PAGES (Movies, Halls, Showtimes, Profile)
    These pages render a bare <section> with an eyebrow, h1, optional
    form and a list of rows. Everything is scoped to .admin-page so it can
    never touch the public site.
