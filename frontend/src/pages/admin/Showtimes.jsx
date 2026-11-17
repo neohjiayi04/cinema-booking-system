@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../services/api.js";
+import { MOVIE_STATUS } from "../../constants/movieOptions.js";
 
 const initialForm = {
   movieId: "",
@@ -11,6 +12,10 @@ const initialForm = {
 
 // Fetches everything the page needs. Lives outside the component so the
 // mount effect can call it without adding dependencies.
+// Pre-select the first movie that can still be scheduled.
+const defaultMovieId = (list) =>
+  (list.find((m) => m.status !== MOVIE_STATUS.ENDED && m.status !== MOVIE_STATUS.ARCHIVED) || list[0])?._id || "";
+
 const fetchAll = () =>
   Promise.all([api("/movies"), api("/halls"), api("/showtimes")]);
 
@@ -26,6 +31,19 @@ export default function Showtimes() {
 
   const isEditing = Boolean(editingId);
 
+  // Ended and archived movies can't get new showtimes. The movie already chosen
+  // in the form stays listed so an existing showtime can still be edited.
+  const selectableMovies = movies.filter(
+    (m) =>
+      m._id === form.movieId ||
+      (m.status !== MOVIE_STATUS.ENDED && m.status !== MOVIE_STATUS.ARCHIVED)
+  );
+
+  // Showtimes must fall inside the movie's availability period.
+  const selectedMovie = movies.find((m) => m._id === form.movieId);
+  const minDate = selectedMovie?.releaseDate ? String(selectedMovie.releaseDate).slice(0, 10) : undefined;
+  const maxDate = selectedMovie?.endDate ? String(selectedMovie.endDate).slice(0, 10) : undefined;
+
   // Used to refresh the data after save / delete
   async function load() {
     const [m, h, s] = await fetchAll();
@@ -36,7 +54,7 @@ export default function Showtimes() {
 
     setForm((f) => ({
       ...f,
-      movieId: f.movieId || m[0]?._id || "",
+      movieId: f.movieId || defaultMovieId(m),
       hallId: f.hallId || h[0]?._id || "",
     }));
   }
@@ -52,7 +70,7 @@ export default function Showtimes() {
         setShowtimes(s);
         setForm((f) => ({
           ...f,
-          movieId: f.movieId || m[0]?._id || "",
+          movieId: f.movieId || defaultMovieId(m),
           hallId: f.hallId || h[0]?._id || "",
         }));
       })
@@ -91,7 +109,7 @@ export default function Showtimes() {
 
     setForm({
       ...initialForm,
-      movieId: movies[0]?._id || "",
+      movieId: defaultMovieId(movies),
       hallId: halls[0]?._id || "",
     });
   }
@@ -122,7 +140,7 @@ export default function Showtimes() {
       setEditingId(null);
       setForm({
         ...initialForm,
-        movieId: movies[0]?._id || "",
+        movieId: defaultMovieId(movies),
         hallId: halls[0]?._id || "",
       });
 
@@ -197,7 +215,7 @@ export default function Showtimes() {
                   required
                 >
                   <option value="" disabled>Select movie</option>
-                  {movies.map((m) => (
+                  {selectableMovies.map((m) => (
                     <option key={m._id} value={m._id}>
                       {m.title}
                     </option>
@@ -231,6 +249,8 @@ export default function Showtimes() {
                   type="date"
                   name="date"
                   className="admin-input"
+                  min={minDate}
+                  max={maxDate}
                   value={form.date}
                   onChange={handleChange}
                   required

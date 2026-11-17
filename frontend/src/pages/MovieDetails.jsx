@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import SeatMap from "../components/SeatMap.jsx";
 import { api } from "../services/api.js";
 import { connectShowtime } from "../services/websocket.js";
+import { MOVIE_STATUS, MOVIE_STATUS_LABELS, statusOf, formatDate } from "../constants/movieOptions.js";
 import "../styles/MovieDetails.css";
 
 const PENDING_KEY = "cinemax.pendingBooking";
@@ -48,9 +49,12 @@ function MovieDetails({ movieId }) {
         if (cancelled) return;
         setMovie(movieData);
         setShowtimes(showtimeData || []);
+        // Movies that aren't Now Showing (coming soon, ended, archived) can't be booked,
+        // so don't preselect a showtime or open the live seat connection for them.
+        const canBook = (movieData.bookable ?? statusOf(movieData) === MOVIE_STATUS.NOW_SHOWING);
         const saved = readPendingBooking();
         const savedShowtime = saved?.movieId === movieId ? saved.showtimeId : "";
-        const initialId = savedShowtime || showtimeData?.[0]?._id || "";
+        const initialId = canBook ? (savedShowtime || showtimeData?.[0]?._id || "") : "";
         setSelectedShowtimeId(initialId);
         setSeatLoading(Boolean(initialId));
       })
@@ -167,6 +171,9 @@ function MovieDetails({ movieId }) {
   if (loading) return <div className="combined-state">Loading movie and showtimes…</div>;
   if (!movie) return <div className="combined-state combined-error">{error || "Movie not found."}<p><Link to="/">Back to movies</Link></p></div>;
 
+  const status = statusOf(movie);
+  const bookable = movie.bookable ?? status === MOVIE_STATUS.NOW_SHOWING;
+
   return (
     <div className="combined-booking-page">
       <Link className="combined-back-link" to="/">← Back to all movies</Link>
@@ -176,17 +183,48 @@ function MovieDetails({ movieId }) {
           <img className="combined-poster" src={movie.poster || "https://placehold.co/400x600?text=Movie"} alt={`${movie.title} poster`} />
         </div>
         <div className="combined-movie-copy">
-          <span className="combined-eyebrow">NOW SHOWING</span>
+          <span className="combined-eyebrow">{MOVIE_STATUS_LABELS[status].toUpperCase()}</span>
           <h1>{movie.title}</h1>
           <div className="combined-meta">
             <span>{Array.isArray(movie.genre) ? movie.genre.join(" · ") : movie.genre}</span>
             {movie.duration && <span>{movie.duration} min</span>}
             {movie.rating && <span>{movie.rating}</span>}
+            {bookable && movie.endDate && <span>Showing until {formatDate(movie.endDate)}</span>}
           </div>
           <p>{movie.description || movie.synopsis || "Choose a screening and your seats to book this movie."}</p>
         </div>
       </section>
 
+      {!bookable ? (
+        <section className={`combined-section combined-status-panel status-${status.toLowerCase().replace("_", "-")}`} role="status">
+          {status === MOVIE_STATUS.COMING_SOON && (
+            <>
+              <h2>Coming soon</h2>
+              <p>
+                You can read about this movie now, but booking isn&apos;t open yet.
+                {movie.releaseDate && <> Booking opens on <strong>{formatDate(movie.releaseDate)}</strong>.</>}
+              </p>
+            </>
+          )}
+          {status === MOVIE_STATUS.ENDED && (
+            <>
+              <h2>No longer showing</h2>
+              <p>
+                This movie has finished its run
+                {movie.endDate && <> (ended <strong>{formatDate(movie.endDate)}</strong>)</>} and can no longer be booked.
+              </p>
+            </>
+          )}
+          {status === MOVIE_STATUS.ARCHIVED && (
+            <>
+              <h2>Archived</h2>
+              <p>This movie is archived and is no longer available for booking.</p>
+            </>
+          )}
+          <Link className="combined-back-link" to="/">Browse movies now showing</Link>
+        </section>
+      ) : (
+        <>
       <section className="combined-section" id="showtimes-section">
         <div className="combined-section-heading">
           <div><span className="combined-eyebrow">01 / SCREENING</span><h2>Choose a showtime</h2></div>
@@ -255,6 +293,8 @@ function MovieDetails({ movieId }) {
         </button>
       </section>
       <p className="combined-auth-note">{user ? `Signed in as ${user.name || user.email}.` : "You'll be asked to log in or register before your booking is created. Your selection will be kept."}</p>
+        </>
+      )}
     </div>
   );
 }

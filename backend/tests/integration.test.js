@@ -1,4 +1,3 @@
-
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import request from "supertest";
@@ -1280,4 +1279,254 @@ test("A cancelled booking should release its seats for another customer", async 
     .expect(201);
 
   assert.deepEqual(response.body.seats, ["A03"]);
+});
+
+// ==================================================
+// 13. MOVIE MANAGEMENT & BOOKING RESTRICTIONS
+// ==================================================
+
+const { archiveExpiredMovies, todayString, addDays } =
+  await import("../src/utils/movieUtils.js");
+
+async function createMovieWithShowtime(fields) {
+  const db = getDb();
+  const movie = {
+    _id: new ObjectId(),
+    title: `Rules Movie ${new ObjectId()}`,
+    description: "",
+    genre: "Action",
+    duration: 100,
+    rating: "PG",
+    poster: "",
+    archived: false,
+    ...fields
+  };
+  movie.titleKey = movie.title.toLowerCase();
+  movie.releaseYear = String(movie.releaseDate).slice(0, 4);
+  await db.collection("movies").insertOne(movie);
+
+  const showtime = {
+    _id: new ObjectId(),
+    movieId: movie._id,
+    hallId,
+    date: movie.releaseDate,
+    startTime: "18:00",
+    price: 15,
+    status: "ACTIVE"
+  };
+  await db.collection("showtimes").insertOne(showtime);
+
+  return { movie, showtime };
+}
+
+async function tryBooking(showtime) {
+  return request(app)
+    .post("/api/bookings")
+    .set("Authorization", `Bearer ${customerToken}`)
+    .send({ showtimeId: showtime._id.toString(), seats: ["A01"] });
+}
+
+test("POST /api/movies should reject an end date earlier than the start date", async () => {
+  const response = await request(app)
+    .post("/api/movies")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({
+      title: "Bad Dates Movie",
+      genre: "Drama",
+      rating: "PG",
+      releaseDate: "2027-03-10",
+      endDate: "2027-03-01"
+    })
+    .expect(400);
+
+  assert.match(response.body.message, /End date cannot be earlier/);
+});
+
+test("PUT /api/movies/:id should reject an end date earlier than the start date", async () => {
+  const { movie } = await createMovieWithShowtime({
+    releaseDate: "2027-04-10",
+    endDate: "2027-04-20"
+  });
+
+  await request(app)
+    .put(`/api/movies/${movie._id}`)
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({ endDate: "2027-04-01" })
+    .expect(400);
+});
+
+test("POST /api/movies should only accept genres and ratings from the lists", async () => {
+  await request(app)
+    .post("/api/movies")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({ title: "Odd Genre Movie", genre: "Not A Genre", rating: "PG", releaseDate: "2027-05-01" })
+    .expect(400);
+
+  await request(app)
+    .post("/api/movies")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({ title: "Odd Rating Movie", genre: "Drama", rating: "Z", releaseDate: "2027-05-01" })
+    .expect(400);
+});
+
+test("POST /api/movies should prevent duplicate movie records", async () => {
+  const payload = {
+    title: "Duplicate Check Movie",
+    genre: "Comedy",
+    rating: "PG",
+    releaseDate: "2027-06-01",
+    endDate: "2027-06-30"
+  };
+
+  await request(app)
+    .post("/api/movies")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send(payload)
+    .expect(201);
+
+  const duplicate = await request(app)
+    .post("/api/movies")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({ ...payload, title: "  duplicate CHECK movie " })
+    .expect(409);
+
+  assert.equal(duplicate.body.code, "DUPLICATE_MOVIE");
+
+  // The same title in a different release year is a different movie.
+  await request(app)
+    .post("/api/movies")
+    .set("Authorization", `Bearer ${adminToken}`)
+    .send({ ...payload, releaseDate: "2028-06-01", endDate: "2028-06-30" })
+    .expect(201);
+});
+
+test("GET /api/movies should return calculated statuses and hide archived movies", async () => {
+  const today = todayString();
+  const upcoming = await createMovieWithShowtime({ releaseDate: addDays(today, 10), endDate: addDays(today, 40) });
+  const showing = await createMovieWithShowtime({ releaseDate: addDays(today, -5), endDate: addDays(today, 5) });
+  const ended = await createMovieWithShowtime({ releaseDate: addDays(today, -30), endDate: addDays(today, -2) });
+  const archived = await createMovieWithShowtime({ releaseDate: addDays(today, -30), endDate: addDays(today, -2), archived: true });
+
+  const response = await request(app).get("/api/movies").expect(200);
+  const byId = id => response.body.find(item => item._id === id.toString());
+
+  assert.equal(byId(upcoming.movie._id).status, "COMING_SOON");
+  assert.equal(byId(showing.movie._id).status, "NOW_SHOWING");
+  assert.equal(byId(ended.movie._id).status, "ENDED");
+  assert.equal(byId(archived.movie._id), undefined);
+});
+
+test("POST /api/bookings should reject a Coming Soon movie", async () => {
+  const today = todayString();
+  const { showtime } = await createMovieWithShowtime({ releaseDate: addDays(today, 10), endDate: addDays(today, 40) });
+
+  const response = await tryBooking(showtime);
+  assert.equal(response.status, 409);
+  assert.equal(response.body.code, "MOVIE_COMING_SOON");
+});
+
+test("POST /api/bookings should reject an Ended movie", async () => {
+  const today = todayString();
+  const { showtime } = await createMovieWithShowtime({ releaseDate: addDays(today, -30), endDate: addDays(today, -1) });
+
+  const response = await tryBooking(showtime);
+  assert.equal(response.status, 409);
+  assert.equal(response.body.code, "MOVIE_ENDED");
+});
+
+test("POST /api/bookings should reject an Archived movie", async () => {
+  const today = todayString();
+  const { showtime } = await createMovieWithShowtime({ releaseDate: addDays(today, -5), endDate: addDays(today, 5), archived: true });
+
+  const response = await tryBooking(showtime);
+  assert.equal(response.status, 409);
+  assert.equal(response.body.code, "MOVIE_ARCHIVED");
+});
+
+test("POST /api/bookings should accept a movie on its last day", async () => {
+  const today = todayString();
+  const { showtime } = await createMovieWithShowtime({ releaseDate: addDays(today, -5), endDate: today });
+
+  const response = await tryBooking(showtime);
+  assert.equal(response.status, 201);
+});
+
+test("DELETE /api/movies/:id should refuse a movie with bookings, and archive/restore should work", async () => {
+  const today = todayString();
+  const { movie, showtime } = await createMovieWithShowtime({ releaseDate: addDays(today, -5), endDate: addDays(today, 5) });
+
+  await getDb().collection("bookings").insertOne({
+    userId: new ObjectId(),
+    showtimeId: showtime._id,
+    seats: ["B01"],
+    status: "CANCELLED",
+    totalAmount: 15,
+    createdAt: new Date()
+  });
+
+  const refused = await request(app)
+    .delete(`/api/movies/${movie._id}`)
+    .set("Authorization", `Bearer ${adminToken}`)
+    .expect(409);
+
+  assert.equal(refused.body.code, "MOVIE_HAS_BOOKINGS");
+  assert.equal(refused.body.bookingCount, 1);
+
+  const archived = await request(app)
+    .put(`/api/movies/${movie._id}/archive`)
+    .set("Authorization", `Bearer ${adminToken}`)
+    .expect(200);
+  assert.equal(archived.body.status, "ARCHIVED");
+
+  const restored = await request(app)
+    .put(`/api/movies/${movie._id}/restore`)
+    .set("Authorization", `Bearer ${adminToken}`)
+    .expect(200);
+  assert.equal(restored.body.status, "NOW_SHOWING");
+});
+
+test("Archive and restore should reject customer access", async () => {
+  await request(app)
+    .put(`/api/movies/${movieId}/archive`)
+    .set("Authorization", `Bearer ${customerToken}`)
+    .expect(403);
+});
+
+test("DELETE /api/movies/:id should remove a movie without bookings and its showtimes", async () => {
+  const today = todayString();
+  const { movie, showtime } = await createMovieWithShowtime({ releaseDate: addDays(today, -5), endDate: addDays(today, 5) });
+
+  await request(app)
+    .delete(`/api/movies/${movie._id}`)
+    .set("Authorization", `Bearer ${adminToken}`)
+    .expect(200);
+
+  assert.equal(await getDb().collection("showtimes").findOne({ _id: showtime._id }), null);
+});
+
+test("POST /api/showtimes should reject dates outside the movie's availability", async () => {
+  const today = todayString();
+  const { movie } = await createMovieWithShowtime({ releaseDate: addDays(today, 1), endDate: addDays(today, 10) });
+
+  for (const date of [today, addDays(today, 11)]) {
+    await request(app)
+      .post("/api/showtimes")
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ movieId: movie._id.toString(), hallId: hallId.toString(), date, startTime: "20:00", price: 20 })
+      .expect(400);
+  }
+});
+
+test("archiveExpiredMovies should archive long-ended movies only", async () => {
+  const today = todayString();
+  const longEnded = await createMovieWithShowtime({ releaseDate: addDays(today, -90), endDate: addDays(today, -45) });
+  const recentlyEnded = await createMovieWithShowtime({ releaseDate: addDays(today, -60), endDate: addDays(today, -5) });
+  const restored = await createMovieWithShowtime({ releaseDate: addDays(today, -90), endDate: addDays(today, -45), restoredAt: new Date() });
+
+  await archiveExpiredMovies(getDb(), { today, afterDays: 30 });
+
+  const movies = getDb().collection("movies");
+  assert.equal((await movies.findOne({ _id: longEnded.movie._id })).archived, true);
+  assert.equal((await movies.findOne({ _id: recentlyEnded.movie._id })).archived, false);
+  assert.equal((await movies.findOne({ _id: restored.movie._id })).archived, false);
 });

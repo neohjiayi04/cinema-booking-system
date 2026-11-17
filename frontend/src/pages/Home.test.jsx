@@ -322,3 +322,59 @@ describe("Home Page", () => {
         expect(screen.getByText("0 FILMS")).toBeInTheDocument();
     });
 });
+
+describe("Home Page availability tabs", () => {
+  const statusMovies = [
+    { _id: "m-now", title: "Now Movie", genre: "Action", duration: 100, rating: "PG", status: "NOW_SHOWING", bookable: true },
+    { _id: "m-soon", title: "Soon Movie", genre: "Comedy", duration: 100, rating: "PG", status: "COMING_SOON", bookable: false, releaseDate: "2027-01-10" },
+    { _id: "m-old", title: "Old Movie", genre: "Drama", duration: 100, rating: "PG", status: "ENDED", bookable: false, endDate: "2026-10-01" }
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApi.mockResolvedValue(statusMovies);
+  });
+
+  it("should show only Now Showing movies by default", async () => {
+    renderHome();
+
+    expect(await screen.findByText("Now Movie")).toBeInTheDocument();
+    expect(screen.queryByText("Soon Movie")).not.toBeInTheDocument();
+    expect(screen.queryByText("Old Movie")).not.toBeInTheDocument();
+  });
+
+  it("should list upcoming movies under Coming Soon", async () => {
+    renderHome();
+
+    await screen.findByText("Now Movie");
+
+    fireEvent.click(screen.getByRole("tab", { name: /Coming Soon/ }));
+
+    expect(screen.getByText("Soon Movie")).toBeInTheDocument();
+    expect(screen.queryByText("Now Movie")).not.toBeInTheDocument();
+    expect(screen.getByText(/Booking opens on each movie/)).toBeInTheDocument();
+  });
+
+  it("should move expired movies to Previously Shown", async () => {
+    renderHome();
+
+    await screen.findByText("Now Movie");
+
+    fireEvent.click(screen.getByRole("tab", { name: /Previously Shown/ }));
+
+    expect(screen.getByText("Old Movie")).toBeInTheDocument();
+    expect(screen.queryByText("Now Movie")).not.toBeInTheDocument();
+  });
+
+  it("should show a friendly message when a tab is empty", async () => {
+    mockApi.mockResolvedValue([statusMovies[0]]);
+
+    renderHome();
+
+    await screen.findByText("Now Movie");
+
+    fireEvent.click(screen.getByRole("tab", { name: /Coming Soon/ }));
+
+    expect(screen.getByText("No upcoming movies announced yet.")).toBeInTheDocument();
+  });
+});

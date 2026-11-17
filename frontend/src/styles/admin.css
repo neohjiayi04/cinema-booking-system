@@ -2909,3 +2909,81 @@ body:has(.admin-layout) {
     gap: 3px;
   }
 }
+
+/* 26. Movie management: status badges, tabs, form hints
+   --------------------------------------------------------- */
+.movie-status-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-family: var(--admin-font);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  vertical-align: middle;
+}
+
+.movie-status-badge.status-now-showing { background: var(--admin-success-bg); color: var(--admin-success); }
+.movie-status-badge.status-coming-soon { background: var(--admin-info-bg); color: var(--admin-info); }
+.movie-status-badge.status-ended { background: var(--admin-warning-bg); color: var(--admin-warning); }
+.movie-status-badge.status-archived { background: var(--admin-surface-raised); color: var(--admin-text-muted); }
+
+.admin-status-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.admin-status-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 999px;
+  background: var(--admin-surface);
+  color: var(--admin-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--admin-transition);
+}
+
+.admin-status-tab:hover { border-color: var(--admin-accent-line); color: var(--admin-accent-text); }
+
+.admin-status-tab.active {
+  border-color: var(--admin-accent-line);
+  background: var(--admin-accent-soft);
+  color: var(--admin-accent-text);
+}
+
+.admin-status-count {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--admin-surface-raised);
+  font-size: 11px;
+  text-align: center;
+}
+
+.admin-field-error {
+  display: block;
+  margin-top: 6px;
+  color: var(--admin-danger);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.admin-form-note {
+  margin: 4px 0 16px;
+  color: var(--admin-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.table-row .table-actions .table-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
