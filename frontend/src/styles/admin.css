@@ -10,7 +10,7 @@
     4. Main area and topbar     17. Chart containers
     5. Buttons                  18. Activity feed
     6. Stat (KPI) cards         19. Scrollbars and selection
-    7. Panels and content grid  20. Management pages (Movies, Halls, Showtimes, Profile
+    7. Panels and content grid  20. Management pages (Dashboard, Movies, Halls, Showtimes, Profile
     8. Tables                   21. Accessibility and motion
     9. Status badges            22. Form control overrides
    10. Search, filters, forms   23. Profile page
@@ -608,7 +608,7 @@ body:has(.admin-layout) {
    --------------------------------------------------------- */
 .admin-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 18px;
   margin-top: 12px;
   margin-bottom: 28px;
@@ -1940,6 +1940,96 @@ body:has(.admin-layout) {
 
 .table-row button:first-of-type:not(:last-of-type):hover {
   background-color: var(--admin-accent-soft-hover);
+}
+
+/* 20.0. Dashboard Page
+   --------------------------------------------------------- */
+/* Movie performance section */
+.movie-performance-panel {
+  margin-bottom: 24px;
+}
+
+.best-movie-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 0 20px 20px;
+  padding: 20px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.best-movie-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  color: #b7791f;
+  background: #fef3c7;
+  border-radius: 12px;
+  font-size: 25px;
+}
+
+.best-movie-information {
+  min-width: 0;
+}
+
+.best-movie-label {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.best-movie-information h3 {
+  margin: 5px 0;
+  color: #0f172a;
+  font-size: 18px;
+}
+
+.best-movie-information p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.best-movie-empty {
+  margin: 0 20px 20px;
+  padding: 18px;
+  color: #64748b;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.movie-performance-table {
+  min-width: 650px;
+}
+
+.movie-performance-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.movie-rank {
+  padding: 3px 7px;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+@media (max-width: 600px) {
+  .best-movie-card {
+    margin-left: 12px;
+    margin-right: 12px;
+    padding: 14px;
+  }
 }
 
 /* 20.1. MOVIE Page
