@@ -1,7 +1,11 @@
 import { config } from "../config.js";
 import { generateValidSeats } from "./seatUtils.js";
 
-export const HALL_STATUS = Object.freeze({ ACTIVE: "ACTIVE", INACTIVE: "INACTIVE" });
+export const HALL_STATUS = Object.freeze({ 
+  ACTIVE: "ACTIVE", 
+  MAINTENANCE: "MAINTENANCE", 
+  INACTIVE: "INACTIVE" 
+});
 
 /* ------------------------------ time ------------------------------ */
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -60,10 +64,16 @@ export function isShowtimeUpcoming(showtime, now = new Date()) {
 }
 
 /* ------------------------------ halls ------------------------------ */
-export const hallStatus = (hall) =>
-  hall?.status === HALL_STATUS.INACTIVE ? HALL_STATUS.INACTIVE : HALL_STATUS.ACTIVE;
+export const hallStatus = (hall) => {
+  const status = String(hall?.status ?? HALL_STATUS.ACTIVE).toUpperCase();
 
-export const hallCapacity = (hall) => Number(hall.rows) * Number(hall.seatsPerRow);
+  return Object.values(HALL_STATUS).includes(status)
+    ? status
+    : HALL_STATUS.ACTIVE;
+};
+
+export const hallCapacity = (hall) => 
+  Number(hall.rows) * Number(hall.seatsPerRow);
 
 export function hallCleaningMinutes(hall) {
   const own = hall?.cleaningMinutes;
@@ -105,12 +115,12 @@ export function validateHall(hall) {
   }
   if (
     hall.cleaningMinutes !== undefined &&
-    (!Number.isInteger(hall.cleaningMinutes) || hall.cleaningMinutes < 0 || hall.cleaningMinutes > 120)
+    (!Number.isInteger(hall.cleaningMinutes) || hall.cleaningMinutes < 0 || hall.cleaningMinutes > 30)
   ) {
-    return "Cleaning time must be a whole number of minutes from 0 to 120.";
+    return "Cleaning time must be a whole number of minutes from 0 to 30.";
   }
   if (hall.status !== undefined && !Object.values(HALL_STATUS).includes(hall.status)) {
-    return "Hall status must be ACTIVE or INACTIVE.";
+    return "Hall status must be ACTIVE, MAINTENANCE, or INACTIVE.";
   }
   return null;
 }

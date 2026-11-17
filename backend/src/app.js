@@ -539,8 +539,35 @@ app.put("/api/halls/:id", requireAuth, requireAdmin, async (req, res) => {
 
   const problem = validateHall(merged);
   if (problem) return res.status(400).json({ message: problem });
+  // A hall cannot be made unavailable while it still has upcoming showtimes.
+  const unavailableStatuses = [HALL_STATUS.MAINTENANCE, HALL_STATUS.INACTIVE];
+
+  if (
+    unavailableStatuses.includes(merged.status) &&
+    hallStatus(existing) === HALL_STATUS.ACTIVE
+  ) {
+    const showtimes = await getDb()
+      .collection("showtimes")
+      .find({ hallId })
+      .toArray();
+
+    const upcomingShowtimes = showtimes.filter(showtime =>
+      isShowtimeUpcoming(showtime)
+    );
+
+    if (upcomingShowtimes.length) {
+      return res.status(409).json({
+        message: `"${existing.name}" has ${upcomingShowtimes.length} upcoming showtime${
+          upcomingShowtimes.length === 1 ? "" : "s"
+        } and cannot be changed to ${merged.status}.`,
+        code: "HALL_HAS_UPCOMING_SHOWTIMES",
+        showtimeCount: upcomingShowtimes.length
+      });
+    }
+  }
 
   const bookedSeats = await getBookedSeatsForHall(hallId);
+  
   const newLayout = generateValidSeats(merged.rows, merged.seatsPerRow);
   const seatsOutside = bookedSeats.filter(seat => !newLayout.has(seat));
   if (seatsOutside.length) {
@@ -673,8 +700,20 @@ app.post("/api/showtimes", requireAuth, requireAdmin, async (req, res) => {
 
   const hall = await db.collection("halls").findOne({ _id: id(hallId) });
   if (!hall) return res.status(404).json({ message: "Hall not found" });
-  if (hallStatus(hall) === HALL_STATUS.INACTIVE) {
-    return res.status(409).json({ message: `"${hall.name}" is inactive and can't receive showtimes.`, code: "HALL_INACTIVE" });
+  
+  //Hall Status Check
+  if (hallStatus(hall) !== HALL_STATUS.ACTIVE) {
+    const status = hallStatus(hall);
+
+    return res.status(409).json({
+      message:
+        status === HALL_STATUS.MAINTENANCE
+          ? `"${hall.name}" is under maintenance and can't receive showtimes.`
+          : `"${hall.name}" is inactive and can't receive showtimes.`,
+      code: status === HALL_STATUS.MAINTENANCE
+        ? "HALL_MAINTENANCE"
+        : "HALL_INACTIVE"
+    });
   }
 
   const dateProblem = showtimeDateProblem(movie, date);
@@ -746,8 +785,18 @@ app.put("/api/showtimes/:id", requireAuth, requireAdmin, async (req, res) => {
   ]);
   if (!movie) return res.status(404).json({ message: "Movie not found" });
   if (!hall) return res.status(404).json({ message: "Hall not found" });
-  if (hallStatus(hall) === HALL_STATUS.INACTIVE) {
-    return res.status(409).json({ message: `"${hall.name}" is inactive and can't receive showtimes.`, code: "HALL_INACTIVE" });
+  if (hallStatus(hall) !== HALL_STATUS.ACTIVE) {
+    const status = hallStatus(hall);
+
+    return res.status(409).json({
+      message:
+        status === HALL_STATUS.MAINTENANCE
+          ? `"${hall.name}" is under maintenance and can't receive showtimes.`
+          : `"${hall.name}" is inactive and can't receive showtimes.`,
+      code: status === HALL_STATUS.MAINTENANCE
+        ? "HALL_MAINTENANCE"
+        : "HALL_INACTIVE"
+    });
   }
 
   const dateProblem = showtimeDateProblem(movie, date);
@@ -933,10 +982,17 @@ app.post("/api/bookings", requireAuth, async (req, res) => {
       return res.status(404).json({ message: "Hall not found" });
     }
 
-    if (hallStatus(hall) === HALL_STATUS.INACTIVE) {
+    if (hallStatus(hall) !== HALL_STATUS.ACTIVE) {
+      const status = hallStatus(hall);
+
       return res.status(409).json({
-        message: `"${hall.name}" is inactive and this showtime can't be booked.`,
-        code: "HALL_INACTIVE"
+        message:
+          status === HALL_STATUS.MAINTENANCE
+            ? `"${hall.name}" is under maintenance and this showtime can't be booked.`
+            : `"${hall.name}" is inactive and this showtime can't be booked.`,
+        code: status === HALL_STATUS.MAINTENANCE
+          ? "HALL_MAINTENANCE"
+          : "HALL_INACTIVE"
       });
     }
 
@@ -1121,10 +1177,17 @@ app.put("/api/bookings/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ message: "Hall not found." });
     }
 
-    if (hallStatus(hall) === HALL_STATUS.INACTIVE) {
+    if (hallStatus(hall) !== HALL_STATUS.ACTIVE) {
+      const status = hallStatus(hall);
+
       return res.status(409).json({
-        message: `"${hall.name}" is inactive and this booking can't be changed.`,
-        code: "HALL_INACTIVE"
+        message:
+          status === HALL_STATUS.MAINTENANCE
+            ? `"${hall.name}" is under maintenance and this booking can't be changed.`
+            : `"${hall.name}" is inactive and this booking can't be changed.`,
+        code: status === HALL_STATUS.MAINTENANCE
+          ? "HALL_MAINTENANCE"
+          : "HALL_INACTIVE"
       });
     }
 
