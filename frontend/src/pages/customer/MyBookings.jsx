@@ -2,25 +2,82 @@ import { useEffect, useState } from "react";
 import { api } from "../../services/api.js";
 import "../../styles/MyBookings.css";
 
+function getBookingCategory(booking) {
+  if (booking.status === "CANCELLED") {
+    return "cancelled";
+  }
+
+  if (booking.status === "COMPLETED") {
+    return "completed";
+  }
+
+  const date = booking.showtime?.date;
+  const startTime = booking.showtime?.startTime;
+  const duration = Number(booking.movie?.duration || 120);
+
+  if (!date || !startTime) {
+    return "upcoming";
+  }
+
+  // Cinema timezone: Malaysia (UTC+8)
+  const startDateTime = new Date(`${date}T${startTime}:00+08:00`);
+  const endDateTime = new Date(
+    startDateTime.getTime() + duration * 60 * 1000
+  );
+
+  return endDateTime <= new Date() ? "completed" : "upcoming";
+}
+
 export default function MyBookings() {
   const [bookings, setBookings] = useState([]);
   const [editingBooking, setEditingBooking] = useState(null);
   const [newSeats, setNewSeats] = useState("");
+  const [activeTab, setActiveTab] = useState("upcoming");
   
-  const fetchBookings = () => {
-    api("/bookings/my").then(setBookings);
+  const fetchBookings = async () => {
+    const data =await api("/bookings/my");
+    setBookings(data);
+    return data;
   };
   
   useEffect(() => {
     fetchBookings();
   }, []);
 
+  // Add the filtered bookings based on the active tab
+  const upcomingBookings = bookings.filter(
+    (b) => getBookingCategory(b) === "upcoming"
+  );
+
+  const completedBookings = bookings.filter(
+    (b) => getBookingCategory(b) === "completed"
+  );
+
+  const cancelledBookings = bookings.filter(
+    (b) => getBookingCategory(b) === "cancelled"
+  );
+
+  const filteredBookings = {
+    upcoming: upcomingBookings,
+    completed: completedBookings,
+    cancelled: cancelledBookings,
+  }[activeTab];
+
   // DELETE operation
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure you want to cancel this booking?")) {
       try {
         await api(`/bookings/${id}`, { method: "DELETE" });
-        setBookings(bookings.filter((b) => b._id !== id));
+
+        setBookings((prev) =>
+          prev.map((b) =>
+            b._id === id
+              ? { ...b, status: "CANCELLED" }
+              : b
+          )
+        );
+
+        setEditingBooking(null);
       } catch (err) {
         alert(err.message || "Failed to cancel booking.");
       }
@@ -35,16 +92,24 @@ export default function MyBookings() {
 
   const handleUpdateSubmit = async (id) => {
     try {
-      const updatedSeatsArray = newSeats.split(",").map((s) => s.trim());
-      const response = await api(`/bookings/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ seats: updatedSeatsArray }),
-      });
+      const updatedSeatArray =newSeats
+      .split(",")
+      .map((s) => s.trim().toUpperCase())
+      .filter(Boolean);
 
-      setBookings(bookings.map((b) => (b._id === id ? response : b)));
+      await api(`/bookings/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({seats:updatedSeatArray}),
+      });
+      
+      //FEtch fully populated bookings after update
+      await fetchBookings();
+
       setEditingBooking(null);
-    } catch (err) {
-      alert(err.message || "Failed to update seats.");
+      setNewSeats("");
+    }
+    catch (err) {
+      alert(err.message || "Failed to update booking.");
     }
   };
 
@@ -61,16 +126,36 @@ export default function MyBookings() {
               Manage movie digital passes, update seat selections, or request cancellations.
             </p>
           </div>
-          <div className="header-badge-group">
-            <span className="filter-pill active">
-              Bookings <span className="pill-count">{bookings.length}</span>
-            </span>
+          <div className="booking-tabs">
+            <button
+              className={`booking-tab ${activeTab === "upcoming" ? "active" : ""}`}
+              onClick={() => setActiveTab("upcoming")}
+            >
+              Upcoming
+              <span>{upcomingBookings.length}</span>
+            </button>
+
+            <button
+              className={`booking-tab ${activeTab === "completed" ? "active" : ""}`}
+              onClick={() => setActiveTab("completed")}
+            >
+              Completed
+              <span>{completedBookings.length}</span>
+            </button>
+
+            <button
+              className={`booking-tab ${activeTab === "cancelled" ? "active" : ""}`}
+              onClick={() => setActiveTab("cancelled")}
+            >
+              Cancelled
+              <span>{cancelledBookings.length}</span>
+            </button>
           </div>
         </div>
 
         {/* Bookings Container */}
         <div className="booking-list">
-          {bookings.map((b) => {
+          {filteredBookings.map((b) => {
             // Generate QR Code dynamic URL
             const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
               b.bookingReference
@@ -100,10 +185,18 @@ export default function MyBookings() {
                 {/* 2. Main Ticket Details */}
                 <div className="ticket-details">
                   <div className="ticket-status-row">
-                    <span className="confirmed-pill">
-                      <span className="status-dot"></span> Confirmed
+                    <span className={`booking-status-pill ${getBookingCategory(b)}`}>
+                      <span className="status-dot"></span>
+                      {getBookingCategory(b) === "upcoming"
+                        ? "Confirmed"
+                        : getBookingCategory(b) === "completed"
+                        ? "Completed"
+                        : "Cancelled"}
                     </span>
-                    <span className="ref-number">Ref #{b.bookingReference}</span>
+
+                    <span className="ref-number">
+                      Ref #{b.bookingReference}
+                    </span>
                   </div>
 
                   <h2 className="movie-title">{b.movie?.title || "Movie Ticket"}</h2>
@@ -151,24 +244,49 @@ export default function MyBookings() {
                   <span className="pass-caption">PASS CODE ACTIVE</span>
 
                   <div className="ticket-actions">
-                    {editingBooking === b._id ? (
-                      <div className="edit-btn-group">
-                        <button className="btn-save" onClick={() => handleUpdateSubmit(b._id)}>
-                          Save
-                        </button>
-                        <button className="btn-cancel-edit" onClick={() => setEditingBooking(null)}>
-                          Cancel
-                        </button>
-                      </div>
+                    {getBookingCategory(b) === "upcoming" ? (
+                      editingBooking === b._id ? (
+                        <div className="edit-btn-group">
+                          <button
+                            className="btn-save"
+                            onClick={() => handleUpdateSubmit(b._id)}
+                          >
+                            Save
+                          </button>
+
+                          <button
+                            className="btn-cancel-edit"
+                            onClick={() => {
+                              setEditingBooking(null);
+                              setNewSeats("");
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <button
+                            className="btn-modify"
+                            onClick={() => handleEditClick(b)}
+                          >
+                            Modify Seats
+                          </button>
+
+                          <button
+                            className="btn-delete"
+                            onClick={() => handleDelete(b._id)}
+                          >
+                            Cancel Pass
+                          </button>
+                        </>
+                      )
                     ) : (
-                      <>
-                        <button className="btn-modify" onClick={() => handleEditClick(b)}>
-                          Modify Seats
-                        </button>
-                        <button className="btn-delete" onClick={() => handleDelete(b._id)}>
-                          Cancel Pass
-                        </button>
-                      </>
+                      <span className="ticket-history-label">
+                        {getBookingCategory(b) === "completed"
+                          ? "Showtime Completed"
+                          : "Booking Cancelled"}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -178,9 +296,15 @@ export default function MyBookings() {
           })}
         </div>
 
-        {!bookings.length && (
+        {filteredBookings.length === 0 && (
           <div className="empty-state">
-            <p>No active movie bookings found.</p>
+            <p>
+              {activeTab === "upcoming"
+                ? "You have no upcoming bookings."
+                : activeTab === "completed"
+                ? "You have no completed movie tickets yet."
+                : "You have no cancelled bookings."}
+            </p>
           </div>
         )}
 

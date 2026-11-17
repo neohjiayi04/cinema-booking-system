@@ -1179,10 +1179,23 @@ app.put("/api/bookings/:id", requireAuth, async (req, res) => {
       });
     }
 
+    // Notify other clients viewing the same showtime that the seats have changed.
+    // This occurs when a customer releases a seat while editing a booking
+    const oldSeats=booking.seats || [];
+
+    const releasedSeats=oldSeats.filter(
+      (seat)=> !uniqueSeats.includes(seat)
+    );
+
+    const bookedSeats =uniqueSeats.filter(
+      (seat)=> !oldSeats.includes(seat)
+    );
+    
     broadcastToShowtime(String(booking.showtimeId), {
       type: "SEATS_UPDATED",
       showtimeId: String(booking.showtimeId),
-      seats: [...new Set([...(booking.seats || []), ...uniqueSeats])]
+      releasedSeats,
+      bookedSeats
     });
 
     const updatedBooking = await bookings.findOne({

@@ -36,6 +36,8 @@ export default function SeatBooking() {
     loadShowtime().catch((e) => setError(e.message));
 
     socket = connectShowtime(id, (message) => {
+      console.log("WebSocket message received:", message);
+      
       if (
         message.type === "CONNECTED" ||
         message.type === "JOINED_SHOWTIME"
