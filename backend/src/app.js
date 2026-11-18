@@ -441,8 +441,27 @@ app.put("/api/movies/:id", requireAuth, requireAdmin, async (req, res) => {
 
 // Archive instead of delete: hides the movie from customers and blocks booking.
 app.put("/api/movies/:id/archive", requireAuth, requireAdmin, async (req, res) => {
-  const result = await getDb().collection("movies").findOneAndUpdate(
-    { _id: id(req.params.id) },
+  const movies = getDb().collection("movies");
+  const movieId = id(req.params.id);
+
+  const movie = await movies.findOne({ _id: movieId });
+
+  if (!movie) {
+    return res.status(404).json({ message: "Movie not found" });
+  }
+
+  const bookingCount = await countBookingsForMovie(movieId);
+
+  if (bookingCount > 0) {
+    return res.status(409).json({
+      message: `"${movie.title}" has ${bookingCount} existing booking${bookingCount === 1 ? "" : "s"} and can't be archived.`,
+      code: "MOVIE_HAS_BOOKINGS",
+      bookingCount
+    });
+  }
+
+  const result = await movies.findOneAndUpdate(
+    { _id: movieId },
     {
       $set: { archived: true, archivedAt: new Date() },
       $unset: { restoredAt: "" }
@@ -450,7 +469,9 @@ app.put("/api/movies/:id/archive", requireAuth, requireAdmin, async (req, res) =
     { returnDocument: "after" }
   );
 
-  if (!result) return res.status(404).json({ message: "Movie not found" });
+  if (!result) {
+    return res.status(404).json({ message: "Movie not found" });
+  }
 
   res.json(decorateMovie(result));
 });
@@ -482,7 +503,7 @@ app.delete("/api/movies/:id", requireAuth, requireAdmin, async (req, res) => {
   const bookingCount = await countBookingsForMovie(movieId);
   if (bookingCount > 0) {
     return res.status(409).json({
-      message: `"${movie.title}" has ${bookingCount} existing booking${bookingCount === 1 ? "" : "s"} and can't be deleted. Archive it instead.`,
+      message: `"${movie.title}" has ${bookingCount} existing booking${bookingCount === 1 ? "" : "s"} and can't be deleted or archived.`,
       code: "MOVIE_HAS_BOOKINGS",
       bookingCount
     });

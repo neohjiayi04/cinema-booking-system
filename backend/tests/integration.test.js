@@ -1469,9 +1469,12 @@ test("POST /api/bookings should accept a movie on its last day", async () => {
   assert.equal(response.status, 201);
 });
 
-test("DELETE /api/movies/:id should refuse a movie with bookings, and archive/restore should work", async () => {
+test("DELETE and archive should refuse a movie with bookings", async () => {
   const today = todayString();
-  const { movie, showtime } = await createMovieWithShowtime({ releaseDate: addDays(today, -5), endDate: addDays(today, 5) });
+  const { movie, showtime } = await createMovieWithShowtime({
+    releaseDate: addDays(today, -5),
+    endDate: addDays(today, 5)
+  });
 
   await getDb().collection("bookings").insertOne({
     userId: new ObjectId(),
@@ -1482,25 +1485,27 @@ test("DELETE /api/movies/:id should refuse a movie with bookings, and archive/re
     createdAt: new Date()
   });
 
-  const refused = await request(app)
+  const refusedDelete = await request(app)
     .delete(`/api/movies/${movie._id}`)
     .set("Authorization", `Bearer ${adminToken}`)
     .expect(409);
 
-  assert.equal(refused.body.code, "MOVIE_HAS_BOOKINGS");
-  assert.equal(refused.body.bookingCount, 1);
+  assert.equal(refusedDelete.body.code, "MOVIE_HAS_BOOKINGS");
+  assert.equal(refusedDelete.body.bookingCount, 1);
 
-  const archived = await request(app)
+  const refusedArchive = await request(app)
     .put(`/api/movies/${movie._id}/archive`)
     .set("Authorization", `Bearer ${adminToken}`)
-    .expect(200);
-  assert.equal(archived.body.status, "ARCHIVED");
+    .expect(409);
 
-  const restored = await request(app)
-    .put(`/api/movies/${movie._id}/restore`)
-    .set("Authorization", `Bearer ${adminToken}`)
-    .expect(200);
-  assert.equal(restored.body.status, "NOW_SHOWING");
+  assert.equal(refusedArchive.body.code, "MOVIE_HAS_BOOKINGS");
+  assert.equal(refusedArchive.body.bookingCount, 1);
+
+  const unchangedMovie = await getDb()
+    .collection("movies")
+    .findOne({ _id: movie._id });
+
+  assert.equal(unchangedMovie.archived, false);
 });
 
 test("Archive and restore should reject customer access", async () => {

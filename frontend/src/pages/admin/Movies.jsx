@@ -266,7 +266,7 @@ export default function Movies() {
             </div>
 
             <div className="admin-form-group full-width">
-              <label className="admin-form-label">
+              <label className="admin-form-label" style={{ marginTop: "4px" }}>
                 Homepage Featured Movie
               </label>
 
@@ -276,7 +276,7 @@ export default function Movies() {
                   checked={form.featured}
                   onChange={e => setForm({ ...form, featured: e.target.checked })}
                 />
-                <span>Display this movie as a Featured movie on the homepage</span>
+                <span className="admin-form-note">Display this movie as a Featured movie on the homepage</span>
               </label>
             </div>
 
@@ -377,7 +377,7 @@ export default function Movies() {
                         </span>
                       )}
                     </strong>
-                    
+
                     <span className="table-row-subtitle">{m.genre} • {m.duration} min • {m.rating}</span>
                     {m.releaseDate && (
                       <span className="table-row-subtitle">
@@ -392,7 +392,18 @@ export default function Movies() {
                     {status === MOVIE_STATUS.ARCHIVED ? (
                       <button className="table-action-btn" onClick={() => restore(m)}>Restore</button>
                     ) : (
-                      <button className="table-action-btn" onClick={() => archive(m)}>Archive</button>
+                      <button
+                        className="table-action-btn"
+                        onClick={() => archive(m)}
+                        disabled={bookingCount > 0}
+                        title={
+                          bookingCount > 0
+                            ? "This movie has bookings, so it can't be archived."
+                            : "Archive movie"
+                        }
+                      >
+                        Archive
+                      </button>
                     )}
                     <button
                       className="table-action-btn delete"
