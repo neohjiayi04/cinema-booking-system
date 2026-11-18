@@ -18,7 +18,8 @@ const empty = {
   rating: "",
   poster: "",
   releaseDate: "",
-  endDate: ""
+  endDate: "",
+  featured: false
 };
 
 const STATUS_TABS = ["ALL", "NOW_SHOWING", "COMING_SOON", "ENDED", "ARCHIVED"];
@@ -72,7 +73,8 @@ export default function Movies() {
       rating: form.rating,
       poster: form.poster,
       releaseDate: form.releaseDate,
-      endDate: form.endDate || null
+      endDate: form.endDate || null,
+      featured: form.featured  === true 
     };
 
     setSaving(true);
@@ -146,7 +148,8 @@ export default function Movies() {
       rating: movie.rating || "",
       poster: movie.poster || "",
       releaseDate: String(movie.releaseDate || "").slice(0, 10),
-      endDate: String(movie.endDate || "").slice(0, 10)
+      endDate: String(movie.endDate || "").slice(0, 10),
+      featured: movie.featured === true
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -262,6 +265,21 @@ export default function Movies() {
               </div>
             </div>
 
+            <div className="admin-form-group full-width">
+              <label className="admin-form-label">
+                Homepage Featured Movie
+              </label>
+
+              <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={form.featured}
+                  onChange={e => setForm({ ...form, featured: e.target.checked })}
+                />
+                <span>Display this movie as a Featured movie on the homepage</span>
+              </label>
+            </div>
+
             <p className="admin-form-note">
               Status is automatic: <strong>Coming Soon</strong> before the start date,
               {" "}<strong>Now Showing</strong> between the start and end dates, and
@@ -352,7 +370,14 @@ export default function Movies() {
                       <span className={`movie-status-badge status-${status.toLowerCase().replace("_", "-")}`}>
                         {MOVIE_STATUS_LABELS[status]}
                       </span>
+
+                      {m.featured === true && (
+                        <span className="movie-featured-badge">
+                          Featured
+                        </span>
+                      )}
                     </strong>
+                    
                     <span className="table-row-subtitle">{m.genre} • {m.duration} min • {m.rating}</span>
                     {m.releaseDate && (
                       <span className="table-row-subtitle">
