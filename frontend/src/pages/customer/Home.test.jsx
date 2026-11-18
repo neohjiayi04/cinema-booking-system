@@ -12,7 +12,7 @@ const { mockApi } = vi.hoisted(() => ({
   mockApi: vi.fn()
 }));
 
-vi.mock("../services/api.js", () => ({
+vi.mock("../../services/api.js", () => ({
   api: mockApi
 }));
 
