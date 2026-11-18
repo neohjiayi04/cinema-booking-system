@@ -2385,7 +2385,7 @@ body:has(.admin-layout) {
   transition: all var(--admin-transition);
 }
 
-/* edit btn table list*/
+/* Edit button */
 .table-row .table-actions .table-action-btn:first-child {
   border-color: var(--admin-accent-line);
   background: var(--admin-accent-soft);
@@ -2397,15 +2397,27 @@ body:has(.admin-layout) {
   color: #fff;
 }
 
-/* Delete btn of the table list*/
+/* Archive / Restore button */
+.table-row .table-actions .table-action-btn:not(.delete):not(:first-child) {
+  border-color: #f59e0b;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.table-row .table-actions .table-action-btn:not(.delete):not(:first-child):hover {
+  background: #f59e0b;
+  color: #fff;
+}
+
+/* Delete button */
 .table-row .table-actions .table-action-btn.delete {
-  border-color: var(--admin-danger-line);
-  background: var(--admin-danger-bg);
-  color: var(--admin-danger);
+  border-color: #ef4444;
+  background: #fef2f2;
+  color: #dc2626;
 }
 
 .table-row .table-actions .table-action-btn.delete:hover {
-  background:  #f96e6e;
+  background: #ef4444;
   color: #fff;
 }
 
@@ -3292,6 +3304,13 @@ body:has(.admin-layout) {
 }
 
 .table-row .table-actions .table-action-btn:disabled {
-  opacity: 0.45;
+  opacity: 0.65;
   cursor: not-allowed;
+  filter: grayscale(0.15);
+}
+
+.table-row .table-actions .table-action-btn.delete:disabled {
+  border-color: #fca5a5;
+  background: #fff1f2;
+  color: #b91c1c;
 }
