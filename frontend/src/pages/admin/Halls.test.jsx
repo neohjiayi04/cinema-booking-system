@@ -42,12 +42,16 @@ describe("Halls Admin Page", () => {
     vi.unstubAllGlobals();
   });
 
-  it("should display the page heading and description", () => {
+  it("should display the page heading and description", async () => {
     renderHalls();
+
+    await waitForHalls();
 
     expect(screen.getByRole("heading", { name: "Halls" })).toBeInTheDocument();
     expect(
-      screen.getByText("Manage and view all cinema halls.")
+      screen.getByText(
+        "Manage cinema halls, seating capacity, cleaning time, and availability status."
+      )
     ).toBeInTheDocument();
   });
 
@@ -129,14 +133,18 @@ describe("Halls Admin Page", () => {
     );
   });
 
-  it("should display the default seat preview", () => {
+  it("should display the default seat preview", async () => {
     renderHalls();
+
+    await waitForHalls();
 
     expect(screen.getByText("40 seats")).toBeInTheDocument();
   });
 
-  it("should update the seat preview when the seating layout changes", () => {
+  it("should update the seat preview when the seating layout changes", async () => {
     renderHalls();
+
+    await waitForHalls();
 
     fireEvent.change(screen.getByLabelText("Rows"), {
       target: { value: "6" },
@@ -158,7 +166,9 @@ describe("Halls Admin Page", () => {
       target: { value: "   " },
     });
 
-    fireEvent.submit(screen.getByRole("button", { name: "+ Add Hall" }).closest("form"));
+    fireEvent.submit(
+      screen.getByRole("button", { name: "+ Add Hall" }).closest("form")
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Please enter a hall name."
@@ -180,10 +190,36 @@ describe("Halls Admin Page", () => {
       target: { value: "0" },
     });
 
-    fireEvent.submit(screen.getByRole("button", { name: "+ Add Hall" }).closest("form"));
+    fireEvent.submit(
+      screen.getByRole("button", { name: "+ Add Hall" }).closest("form")
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Rows and seats per row must be whole numbers of at least 1."
+    );
+
+    expect(mockApi).toHaveBeenCalledTimes(1);
+  });
+
+  it("should reject an invalid cleaning time", async () => {
+    renderHalls();
+
+    await waitForHalls();
+
+    fireEvent.change(screen.getByLabelText("Hall name"), {
+      target: { value: "Hall 3" },
+    });
+
+    fireEvent.change(screen.getByLabelText("Cleaning time (minutes)"), {
+      target: { value: "-5" },
+    });
+
+    fireEvent.submit(
+      screen.getByRole("button", { name: "+ Add Hall" }).closest("form")
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Cleaning time must be a whole number of 0 minutes or more."
     );
 
     expect(mockApi).toHaveBeenCalledTimes(1);
@@ -206,6 +242,14 @@ describe("Halls Admin Page", () => {
       target: { value: "10" },
     });
 
+    fireEvent.change(screen.getByLabelText("Cleaning time (minutes)"), {
+      target: { value: "25" },
+    });
+
+    fireEvent.change(screen.getByLabelText("Status"), {
+      target: { value: "MAINTENANCE" },
+    });
+
     fireEvent.click(screen.getByRole("button", { name: "+ Add Hall" }));
 
     await waitFor(() => {
@@ -215,6 +259,8 @@ describe("Halls Admin Page", () => {
           name: "Hall 3",
           rows: 4,
           seatsPerRow: 10,
+          cleaningMinutes: 25,
+          status: "MAINTENANCE",
         }),
       });
     });
@@ -224,6 +270,31 @@ describe("Halls Admin Page", () => {
     );
 
     expect(screen.getByLabelText("Hall name")).toHaveValue("");
+  });
+
+  it("should use the default cleaning time and status when creating a hall", async () => {
+    renderHalls();
+
+    await waitForHalls();
+
+    fireEvent.change(screen.getByLabelText("Hall name"), {
+      target: { value: "Hall 4" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "+ Add Hall" }));
+
+    await waitFor(() => {
+      expect(mockApi).toHaveBeenCalledWith("/halls", {
+        method: "POST",
+        body: JSON.stringify({
+          name: "Hall 4",
+          rows: 5,
+          seatsPerRow: 8,
+          cleaningMinutes: 20,
+          status: "ACTIVE",
+        }),
+      });
+    });
   });
 
   it("should load the selected hall into the form for editing", async () => {
@@ -241,7 +312,12 @@ describe("Halls Admin Page", () => {
     expect(screen.getByLabelText("Hall name")).toHaveValue("Hall 1");
     expect(screen.getByLabelText("Rows")).toHaveValue(5);
     expect(screen.getByLabelText("Seats per row")).toHaveValue(8);
-    expect(screen.getByRole("button", { name: "Save Changes" })).toBeInTheDocument();
+    // Halls without these fields fall back to the defaults
+    expect(screen.getByLabelText("Cleaning time (minutes)")).toHaveValue(20);
+    expect(screen.getByLabelText("Status")).toHaveValue("ACTIVE");
+    expect(
+      screen.getByRole("button", { name: "Save Changes" })
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
   });
 
@@ -265,6 +341,8 @@ describe("Halls Admin Page", () => {
           name: "Premium Hall",
           rows: 5,
           seatsPerRow: 8,
+          cleaningMinutes: 20,
+          status: "ACTIVE",
         }),
       });
     });
