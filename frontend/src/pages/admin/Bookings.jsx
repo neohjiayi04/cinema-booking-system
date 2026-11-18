@@ -49,7 +49,26 @@ export default function Bookings() {
   }
 
   useEffect(() => {
-    load();
+    let cancelled = false;
+
+    async function loadBookings() {
+      try {
+        const data = await api("/bookings");
+        if (!cancelled) {
+          setBookings(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message);
+        }
+      }
+    }
+
+    loadBookings();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const confirmedBookings = bookings.filter(

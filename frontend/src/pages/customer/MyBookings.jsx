@@ -35,13 +35,31 @@ export default function MyBookings() {
   const [activeTab, setActiveTab] = useState("upcoming");
   
   const fetchBookings = async () => {
-    const data =await api("/bookings/my");
+    const data = await api("/bookings/my");
     setBookings(data);
     return data;
   };
-  
+
   useEffect(() => {
-    fetchBookings();
+    let cancelled = false;
+
+    async function loadBookings() {
+      try {
+        const data = await api("/bookings/my");
+
+        if (!cancelled) {
+          setBookings(data);
+        }
+      } catch (err) {
+        console.error("Failed to load bookings:", err);
+      }
+    }
+
+    loadBookings();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Add the filtered bookings based on the active tab

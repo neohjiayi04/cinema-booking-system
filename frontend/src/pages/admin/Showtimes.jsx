@@ -102,25 +102,6 @@ function formatTime(time) {
   });
 }
 
-function movieStatusLabel(status) {
-  switch (status) {
-    case MOVIE_STATUS.NOW_SHOWING:
-      return "Now Showing";
-
-    case MOVIE_STATUS.COMING_SOON:
-      return "Coming Soon";
-
-    case MOVIE_STATUS.ENDED:
-      return "Ended";
-
-    case MOVIE_STATUS.ARCHIVED:
-      return "Archived";
-
-    default:
-      return status || "";
-  }
-}
-
 function hallStatusLabel(status) {
   switch (status) {
     case HALL_STATUS.MAINTENANCE:

@@ -258,11 +258,6 @@ export default function AdminDashboard() {
   );
 
   // Overall performance
-  const totalTicketsSold = rankedMovies.reduce(
-    (total, movie) => total + movie.ticketsSold,
-    0
-  );
-
   const totalConfirmedRevenue = rankedMovies.reduce(
     (total, movie) => total + movie.revenue,
     0

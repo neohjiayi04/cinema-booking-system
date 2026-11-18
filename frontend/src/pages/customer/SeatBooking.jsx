@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import SeatMap from "../../components/SeatMap.jsx";
 import { api } from "../../services/api.js";
@@ -16,9 +16,11 @@ export default function SeatBooking() {
   const [connected, setConnected] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  async function loadShowtime() {
-    const data = await api(`/showtimes/${id}`);
+  const fetchShowtime = useCallback(async () => {
+    return api(`/showtimes/${id}`);
+  }, [id]);
 
+  function applyShowtimeData(data) {
     setShowtime(data);
     setBookedSeats(data.bookedSeats || []);
 
@@ -32,12 +34,27 @@ export default function SeatBooking() {
 
   useEffect(() => {
     let socket;
+    let cancelled = false;
 
-    loadShowtime().catch((e) => setError(e.message));
+    async function loadInitialShowtime() {
+      try {
+        const data = await fetchShowtime();
+
+        if (!cancelled) {
+          applyShowtimeData(data);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e.message);
+        }
+      }
+    }
+
+    loadInitialShowtime();
 
     socket = connectShowtime(id, (message) => {
       console.log("WebSocket message received:", message);
-      
+
       if (
         message.type === "CONNECTED" ||
         message.type === "JOINED_SHOWTIME"
@@ -79,9 +96,10 @@ export default function SeatBooking() {
     });
 
     return () => {
+      cancelled = true;
       socket?.close();
     };
-  }, [id]);
+  }, [id, fetchShowtime]);
 
   function toggleSeat(seat) {
     if (bookedSeats.includes(seat)) {
@@ -125,7 +143,8 @@ export default function SeatBooking() {
       // refresh the showtime data automatically.
       if (message.toLowerCase().includes("just been booked")) {
         try {
-          const latestShowtime = await loadShowtime();
+          const latestShowtime = await fetchShowtime();
+          applyShowtimeData(latestShowtime);
 
           setSelectedSeats((prev) =>
             prev.filter(
