@@ -3,9 +3,12 @@ name: CI/CD
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - fix/final-working-version
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
