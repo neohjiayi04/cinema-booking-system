@@ -1445,7 +1445,25 @@ test("POST /api/bookings should reject an Archived movie", async () => {
 
 test("POST /api/bookings should accept a movie on its last day", async () => {
   const today = todayString();
-  const { showtime } = await createMovieWithShowtime({ releaseDate: addDays(today, -5), endDate: today });
+
+  const { showtime } = await createMovieWithShowtime({
+    releaseDate: addDays(today, -5),
+    endDate: today
+  });
+
+  // The showtime must also be today and in the future.
+  showtime.date = today;
+  showtime.startTime = "23:59";
+
+  await getDb().collection("showtimes").updateOne(
+    { _id: showtime._id },
+    {
+      $set: {
+        date: today,
+        startTime: "23:59"
+      }
+    }
+  );
 
   const response = await tryBooking(showtime);
   assert.equal(response.status, 201);

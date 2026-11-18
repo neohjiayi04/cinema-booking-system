@@ -69,7 +69,13 @@ export function getMovieStatus(movie, today = todayString()) {
 export function decorateMovie(movie, today = todayString()) {
   if (!movie) return movie;
   const status = getMovieStatus(movie, today);
-  return { ...movie, endDate: movie.endDate || null, status, bookable: status === MOVIE_STATUS.NOW_SHOWING };
+  return {
+    ...movie,
+    endDate: movie.endDate || null,
+    featured: movie.featured === true,
+    status,
+    bookable: status === MOVIE_STATUS.NOW_SHOWING
+  };
 }
 
 export function bookingBlockedMessage(movie, status) {
@@ -142,7 +148,12 @@ export function pickMovieFields(body = {}) {
   }
   if (body.duration !== undefined) out.duration = Number(body.duration);
   if (body.releaseDate !== undefined && body.releaseDate !== "") out.releaseDate = String(body.releaseDate).slice(0, 10);
-  if (body.endDate !== undefined) out.endDate = body.endDate ? String(body.endDate).slice(0, 10) : null;
+  if (body.endDate !== undefined) {
+    out.endDate = body.endDate ? String(body.endDate).slice(0, 10) : null;
+  }
+  if (body.featured !== undefined) {
+    out.featured = body.featured === true;
+  }
   return out;
 }
 

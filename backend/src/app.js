@@ -352,6 +352,7 @@ app.post("/api/movies", requireAuth, requireAdmin, async (req, res) => {
     poster: input.poster || "",
     releaseDate: input.releaseDate || todayString(),
     endDate: input.endDate || null,
+    featured: input.featured === true,
     archived: false,
     createdAt: new Date()
   };

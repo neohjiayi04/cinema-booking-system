@@ -111,7 +111,7 @@
 }
 
 /* Luxury Primary Button */
-.btn-primary {
+.button.btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -130,7 +130,7 @@
   min-height: 50px;
 }
 
-.btn-primary:hover {
+.button.btn-primary:hover {
   background: #fbbf24;
   transform: translateY(-2px);
   box-shadow: 0 15px 30px -5px rgba(251, 191, 36, 0.3);
