@@ -590,7 +590,7 @@ body:has(.admin-layout) {
 
 /* Delete btn of the table list*/
 .table-row .table-actions .table-action-btn.delete {
-  border-color: var(--admin-danger-line);
+  border-color: #fa7878;
   background: var(--admin-danger-bg);
   color: var(--admin-danger);
 }
@@ -1514,6 +1514,7 @@ body:has(.admin-layout) {
 }
 
 .admin-alert-warning {
+  margin-top: 4px;
   border-color: rgba(168, 106, 12, 0.26);
   background: var(--admin-warning-bg);
   color: var(--admin-warning);
@@ -2401,7 +2402,7 @@ body:has(.admin-layout) {
 .table-row .table-actions .table-action-btn:not(.delete):not(:first-child) {
   border-color: #f59e0b;
   background: #fff7ed;
-  color: #c2410c;
+  color: #ee8156;
 }
 
 .table-row .table-actions .table-action-btn:not(.delete):not(:first-child):hover {
@@ -2411,7 +2412,7 @@ body:has(.admin-layout) {
 
 /* Delete button */
 .table-row .table-actions .table-action-btn.delete {
-  border-color: #ef4444;
+  border-color: #f65858;
   background: #fef2f2;
   color: #dc2626;
 }

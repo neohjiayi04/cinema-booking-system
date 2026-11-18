@@ -163,19 +163,19 @@ export default function Bookings() {
             <span className="booking-summary-note">All recorded reservations</span>
           </article>
 
-          <article className="booking-summary-card">
+          <article className="booking-summary-card.pink">
             <span className="booking-summary-label">Confirmed bookings</span>
             <strong>{confirmedBookings.length}</strong>
             <span className="booking-summary-note">Active reservations</span>
           </article>
 
-          <article className="booking-summary-card">
+          <article className="booking-summary-card.orange">
             <span className="booking-summary-label">Cancelled bookings</span>
             <strong>{cancelledBookings.length}</strong>
             <span className="booking-summary-note">Cancelled reservations</span>
           </article>
 
-          <article className="booking-summary-card">
+          <article className="booking-summary-card.teal">
             <span className="booking-summary-label">Confirmed revenue</span>
             <strong>{formatAmount(confirmedRevenue)}</strong>
             <span className="booking-summary-note">

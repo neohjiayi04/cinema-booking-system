@@ -40,13 +40,6 @@
   --stat-line: rgba(91, 91, 240, 0.20);
 }
 
-/* Blue */
-.booking-summary-card.blue {
-  --stat: #5b5bf0;
-  --stat-soft: rgba(91, 91, 240, 0.10);
-  --stat-line: rgba(91, 91, 240, 0.20);
-}
-
 /* Teal */
 .booking-summary-card.teal {
   --stat: #0f9d8a;
