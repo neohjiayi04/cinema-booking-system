@@ -12,11 +12,11 @@ const { mockApi, mockUpdateUser, mockLogout, mockUseAuth } = vi.hoisted(
   })
 );
 
-vi.mock("../services/api.js", () => ({
+vi.mock("../../services/api.js", () => ({
   api: mockApi
 }));
 
-vi.mock("../context/AuthContext.jsx", () => ({
+vi.mock("../../context/AuthContext.jsx", () => ({
   useAuth: mockUseAuth
 }));
 

@@ -26,15 +26,15 @@ const {
   mockSocketClose: vi.fn()
 }));
 
-vi.mock("../services/api.js", () => ({
+vi.mock("../../services/api.js", () => ({
   api: mockApi
 }));
 
-vi.mock("../context/AuthContext.jsx", () => ({
+vi.mock("../../context/AuthContext.jsx", () => ({
   useAuth: mockUseAuth
 }));
 
-vi.mock("../services/websocket.js", () => ({
+vi.mock("../../services/websocket.js", () => ({
   connectShowtime: mockConnectShowtime
 }));
 

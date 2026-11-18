@@ -6,7 +6,7 @@ const { mockApi } = vi.hoisted(() => ({
   mockApi: vi.fn()
 }));
 
-vi.mock("../services/api.js", () => ({
+vi.mock("../../services/api.js", () => ({
   api: mockApi
 }));
 
@@ -136,7 +136,7 @@ describe("MyBookings Page", () => {
         renderMyBookings();
 
         expect(
-        await screen.findByText("No active movie bookings found.")
+        await screen.findByText("You have no upcoming bookings.")
         ).toBeInTheDocument();
     });
 
@@ -168,39 +168,43 @@ describe("MyBookings Page", () => {
     });
 
     it("should update the selected seats when Save is clicked", async () => {
-        mockApi.mockImplementation((url, options) => {
-        if (options?.method === "PUT") {
-            return Promise.resolve({
-            ...sampleBooking,
-            seats: ["B01", "B02"]
-            });
-        }
+        let updatedBooking = sampleBooking;
 
-        return Promise.resolve([sampleBooking]);
+        mockApi.mockImplementation((url, options) => {
+            if (options?.method === "PUT") {
+                updatedBooking = {
+                    ...sampleBooking,
+                    seats: ["B01", "B02"]
+                };
+
+                return Promise.resolve(updatedBooking);
+            }
+
+            return Promise.resolve([updatedBooking]);
         });
 
         renderMyBookings();
 
         fireEvent.click(
-        await screen.findByRole("button", { name: "Modify Seats" })
+            await screen.findByRole("button", { name: "Modify Seats" })
         );
 
         fireEvent.change(screen.getByDisplayValue("A01, A02"), {
-        target: { value: "B01, B02" }
+            target: { value: "B01, B02" }
         });
 
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
         await waitFor(() => {
-        expect(mockApi).toHaveBeenCalledWith(
-            "/bookings/booking-1",
-            {
-            method: "PUT",
-            body: JSON.stringify({
-                seats: ["B01", "B02"]
-            })
-            }
-        );
+            expect(mockApi).toHaveBeenCalledWith(
+                "/bookings/booking-1",
+                {
+                    method: "PUT",
+                    body: JSON.stringify({
+                        seats: ["B01", "B02"]
+                    })
+                }
+            );
         });
 
         expect(await screen.findByText("B01, B02")).toBeInTheDocument();
