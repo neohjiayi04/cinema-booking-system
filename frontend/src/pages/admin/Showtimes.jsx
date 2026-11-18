@@ -245,9 +245,9 @@ export default function Showtimes() {
     setEditingId(showtime._id);
 
     setForm({
-      movieId: showtime.movieId,
-      hallId: showtime.hallId,
-      date: showtime.date,
+      movieId: showtime.movieId || showtime.movie?._id || "",
+      hallId: showtime.hallId || showtime.hall?._id || "",
+      date: String(showtime.date || "").slice(0, 10),
       startTime: showtime.startTime,
       price: showtime.price,
     });
@@ -909,7 +909,7 @@ export default function Showtimes() {
                         </td>
 
                         <td>
-                          {showtime.date}
+                          {String(showtime.date || "").slice(0, 10)}
                         </td>
 
                         <td>
