@@ -18,13 +18,70 @@
 }
 
 .booking-summary-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 20px;
-  background: #fff;
-  border: 1px solid #7b93c4;
-  border-radius: 12px;
+  padding: 30px 30px 26px;
+  background:
+    radial-gradient(
+      circle at 88% 0%,
+      var(--stat-soft) 0%,
+      transparent 34%
+    ),
+    #fff;
+  border: 1px solid #e8e8f0;
+  border-radius: 20px;
+  box-shadow: var(--admin-shadow-card);
+  overflow: hidden;
+
+  --stat: #5b5bf0;
+  --stat-soft: rgba(91, 91, 240, 0.10);
+  --stat-line: rgba(91, 91, 240, 0.20);
+}
+
+/* Blue */
+.booking-summary-card.blue {
+  --stat: #5b5bf0;
+  --stat-soft: rgba(91, 91, 240, 0.10);
+  --stat-line: rgba(91, 91, 240, 0.20);
+}
+
+/* Teal */
+.booking-summary-card.teal {
+  --stat: #0f9d8a;
+  --stat-soft: rgba(15, 157, 138, 0.12);
+  --stat-line: rgba(15, 157, 138, 0.22);
+}
+
+/* Orange */
+.booking-summary-card.orange {
+  --stat: #e89028;
+  --stat-soft: rgba(232, 144, 40, 0.12);
+  --stat-line: rgba(232, 144, 40, 0.22);
+}
+
+/* Pink */
+.booking-summary-card.pink {
+  --stat: #e85b86;
+  --stat-soft: rgba(232, 91, 134, 0.11);
+  --stat-line: rgba(232, 91, 134, 0.20);
+}
+
+/* Top accent line */
+.booking-summary-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--stat) 0%,
+    var(--stat-line) 70%,
+    transparent 100%
+  );
 }
 
 .booking-summary-label {
@@ -35,6 +92,7 @@
 
 .booking-summary-card strong {
   color: #111827;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 25px;
   font-weight: 700;
 }
