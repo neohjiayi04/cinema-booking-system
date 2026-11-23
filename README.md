@@ -390,33 +390,114 @@ The seed process is designed to avoid unnecessary duplication of existing record
 
 ```text
 cinema-booking-system/
+├── .github/
+│   └── workflows/
+│       └── ci-cd.yml
 │
 ├── backend/
 │   ├── src/
-│   │   ├── controllers/
-│   │   ├── middleware/
-│   │   ├── models/
-│   │   ├── routes/
-│   │   ├── services/
-│   │   └── ...
-│   │
+│   │   ├── utils/
+│   │   │   ├── movieUtils.js
+│   │   │   ├── seatUtils.js
+│   │   │   └── showtimeUtils.js
+│   │   ├── app.js
+│   │   ├── auth.js
+│   │   ├── config.js
+│   │   ├── db.js
+│   │   ├── seed.js
+│   │   └── server.js
 │   ├── tests/
+│   │   ├── integration.test.js
+│   │   ├── movieUtils.test.js
+│   │   ├── seatUtils.test.js
+│   │   └── showtimeUtils.test.js
+│   ├── .dockerignore
 │   ├── Dockerfile
-│   └── package.json
+│   ├── eslint.config.js
+│   ├── package.json
+│   └── package-lock.json
 │
 ├── frontend/
 │   ├── src/
 │   │   ├── components/
+│   │   │   ├── AdminLayout.jsx
+│   │   │   ├── AdminLayout.test.jsx
+│   │   │   ├── MovieCard.jsx
+│   │   │   ├── MovieCard.test.jsx
+│   │   │   ├── Navbar.jsx
+│   │   │   ├── Navbar.test.jsx
+│   │   │   ├── SeatMap.jsx
+│   │   │   └── SeatMap.test.jsx
+│   │   ├── constants/
+│   │   │   └── movieOptions.js
+│   │   ├── context/
+│   │   │   ├── AuthContext.jsx
+│   │   │   └── AuthContext.test.jsx
 │   │   ├── pages/
-│   │   │   ├── customer/
-│   │   │   └── admin/
+│   │   │   ├── Login.jsx
+│   │   │   ├── Login.test.jsx
+│   │   │   ├── Register.jsx
+│   │   │   ├── Register.test.jsx
+│   │   │   ├── admin/
+│   │   │   │   ├── Bookings.jsx
+│   │   │   │   ├── Bookings.test.jsx
+│   │   │   │   ├── Dashboard.jsx
+│   │   │   │   ├── Dashboard.test.jsx
+│   │   │   │   ├── Halls.jsx
+│   │   │   │   ├── Halls.test.jsx
+│   │   │   │   ├── Movies.jsx
+│   │   │   │   ├── Movies.test.jsx
+│   │   │   │   ├── Profile.jsx
+│   │   │   │   ├── Profile.test.jsx
+│   │   │   │   ├── Showtimes.jsx
+│   │   │   │   └── Showtimes.test.jsx
+│   │   │   └── customer/
+│   │   │       ├── BookingConfirmation.jsx
+│   │   │       ├── BookingConfirmation.test.jsx
+│   │   │       ├── Home.jsx
+│   │   │       ├── Home.test.jsx
+│   │   │       ├── MovieDetails.jsx
+│   │   │       ├── MovieDetails.test.jsx
+│   │   │       ├── MyBookings.jsx
+│   │   │       ├── MyBookings.test.jsx
+│   │   │       ├── SeatBooking.jsx
+│   │   │       ├── SeatBooking.test.jsx
+│   │   │       ├── UserProfile.jsx
+│   │   │       └── UserProfile.test.jsx
 │   │   ├── services/
-│   │   └── ...
-│   │
+│   │   │   ├── api.js
+│   │   │   ├── api.test.js
+│   │   │   ├── websocket.js
+│   │   │   └── websocket.test.jsx
+│   │   ├── styles/
+│   │   │   ├── admin.css
+│   │   │   ├── AdminBookings.css
+│   │   │   ├── BookingConfirmation.css
+│   │   │   ├── Home.css
+│   │   │   ├── MovieDetails.css
+│   │   │   ├── MyBookings.css
+│   │   │   ├── Navbar.css
+│   │   │   ├── SeatBooking.css
+│   │   │   └── UserProfile.css
+│   │   ├── test/
+│   │   │   └── setup.js
+│   │   ├── App.jsx
+│   │   ├── App.test.jsx
+│   │   ├── main.jsx
+│   │   └── styles.css
+│   ├── .dockerignore
 │   ├── Dockerfile
-│   └── package.json
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── nginx.conf
+│   ├── package.json
+│   ├── package-lock.json
+│   └── vite.config.js
 │
+├── .env
+├── .gitignore
 ├── docker-compose.yml
+├── project-structure.txt
 └── README.md
 ```
 
