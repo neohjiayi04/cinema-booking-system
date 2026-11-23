@@ -10,6 +10,13 @@ vi.mock("../../services/api.js", () => ({
   api: mockApi
 }));
 
+// The page treats a booking as Completed once its showtime has ended, so the fixture
+// date is generated relative to today. A fixed date would eventually fall in the past
+// and make these tests fail.
+const upcomingDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+  .toISOString()
+  .slice(0, 10);
+
 const sampleBooking = {
   _id: "booking-1",
   bookingReference: "CINEMA123",
@@ -18,7 +25,7 @@ const sampleBooking = {
     poster: "https://example.com/interstellar.jpg"
   },
   showtime: {
-    date: "2026-11-20",
+    date: upcomingDate,
     startTime: "19:30"
   },
   hall: {
@@ -65,7 +72,7 @@ describe("MyBookings Page", () => {
 
     expect(await screen.findByText("Interstellar")).toBeInTheDocument();
     expect(screen.getByText(/CINEMA123/)).toBeInTheDocument();
-    expect(screen.getByText("2026-11-20")).toBeInTheDocument();
+    expect(screen.getByText(upcomingDate)).toBeInTheDocument();
     expect(screen.getByText("19:30")).toBeInTheDocument();
     expect(screen.getByText("Hall 1")).toBeInTheDocument();
     expect(screen.getByText("A01, A02")).toBeInTheDocument();

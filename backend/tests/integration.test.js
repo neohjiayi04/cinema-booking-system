@@ -18,6 +18,11 @@ const { app, server } =
 const { hashPassword, createToken } =
   await import("../src/auth.js");
 
+// Showtimes must be in the future to be bookable, so fixture dates are generated
+// relative to today instead of being hard-coded (a fixed date eventually expires).
+const futureDate = (daysAhead) =>
+  new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
 // --------------------------------------------------
 // TEST FIXTURES
 // --------------------------------------------------
@@ -121,7 +126,7 @@ before(async () => {
     _id: showtimeId,
     movieId,
     hallId,
-    date: "2026-11-20",
+    date: futureDate(30),
     startTime: "19:00",
     price: 18,
     status: "ACTIVE"
@@ -717,7 +722,7 @@ test("POST /api/showtimes should reject customer access", async () => {
     .send({
       movieId: movieId.toString(),
       hallId: hallId.toString(),
-      date: "2026-12-01",
+      date: futureDate(35),
       startTime: "20:00",
       price: 20
     })
@@ -741,7 +746,7 @@ test("POST /api/showtimes should allow admin to create a showtime", async () => 
     .send({
       movieId: movieId.toString(),
       hallId: hallId.toString(),
-      date: "2026-12-05",
+      date: futureDate(36),
       startTime: "21:00",
       price: 22
     })
@@ -795,7 +800,7 @@ test("DELETE /api/showtimes/:id should allow admin to delete a showtime", async 
     .send({
       movieId: movieId.toString(),
       hallId: hallId.toString(),
-      date: "2026-12-10",
+      date: futureDate(37),
       startTime: "18:00",
       price: 18
     })
