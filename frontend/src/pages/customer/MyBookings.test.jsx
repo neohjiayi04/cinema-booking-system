@@ -6,9 +6,16 @@ const { mockApi } = vi.hoisted(() => ({
   mockApi: vi.fn()
 }));
 
-vi.mock("../services/api.js", () => ({
+vi.mock("../../services/api.js", () => ({
   api: mockApi
 }));
+
+// The page treats a booking as Completed once its showtime has ended, so the fixture
+// date is generated relative to today. A fixed date would eventually fall in the past
+// and make these tests fail.
+const upcomingDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+  .toISOString()
+  .slice(0, 10);
 
 const sampleBooking = {
   _id: "booking-1",
@@ -18,7 +25,7 @@ const sampleBooking = {
     poster: "https://example.com/interstellar.jpg"
   },
   showtime: {
-    date: "2026-11-20",
+    date: upcomingDate,
     startTime: "19:30"
   },
   hall: {
@@ -65,7 +72,7 @@ describe("MyBookings Page", () => {
 
     expect(await screen.findByText("Interstellar")).toBeInTheDocument();
     expect(screen.getByText(/CINEMA123/)).toBeInTheDocument();
-    expect(screen.getByText("2026-11-20")).toBeInTheDocument();
+    expect(screen.getByText(upcomingDate)).toBeInTheDocument();
     expect(screen.getByText("19:30")).toBeInTheDocument();
     expect(screen.getByText("Hall 1")).toBeInTheDocument();
     expect(screen.getByText("A01, A02")).toBeInTheDocument();
@@ -136,7 +143,7 @@ describe("MyBookings Page", () => {
         renderMyBookings();
 
         expect(
-        await screen.findByText("No active movie bookings found.")
+        await screen.findByText("You have no upcoming bookings.")
         ).toBeInTheDocument();
     });
 
@@ -168,39 +175,43 @@ describe("MyBookings Page", () => {
     });
 
     it("should update the selected seats when Save is clicked", async () => {
-        mockApi.mockImplementation((url, options) => {
-        if (options?.method === "PUT") {
-            return Promise.resolve({
-            ...sampleBooking,
-            seats: ["B01", "B02"]
-            });
-        }
+        let updatedBooking = sampleBooking;
 
-        return Promise.resolve([sampleBooking]);
+        mockApi.mockImplementation((url, options) => {
+            if (options?.method === "PUT") {
+                updatedBooking = {
+                    ...sampleBooking,
+                    seats: ["B01", "B02"]
+                };
+
+                return Promise.resolve(updatedBooking);
+            }
+
+            return Promise.resolve([updatedBooking]);
         });
 
         renderMyBookings();
 
         fireEvent.click(
-        await screen.findByRole("button", { name: "Modify Seats" })
+            await screen.findByRole("button", { name: "Modify Seats" })
         );
 
         fireEvent.change(screen.getByDisplayValue("A01, A02"), {
-        target: { value: "B01, B02" }
+            target: { value: "B01, B02" }
         });
 
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
         await waitFor(() => {
-        expect(mockApi).toHaveBeenCalledWith(
-            "/bookings/booking-1",
-            {
-            method: "PUT",
-            body: JSON.stringify({
-                seats: ["B01", "B02"]
-            })
-            }
-        );
+            expect(mockApi).toHaveBeenCalledWith(
+                "/bookings/booking-1",
+                {
+                    method: "PUT",
+                    body: JSON.stringify({
+                        seats: ["B01", "B02"]
+                    })
+                }
+            );
         });
 
         expect(await screen.findByText("B01, B02")).toBeInTheDocument();

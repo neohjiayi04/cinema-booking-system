@@ -26,15 +26,15 @@ const {
   mockSocketClose: vi.fn()
 }));
 
-vi.mock("../services/api.js", () => ({
+vi.mock("../../services/api.js", () => ({
   api: mockApi
 }));
 
-vi.mock("../context/AuthContext.jsx", () => ({
+vi.mock("../../context/AuthContext.jsx", () => ({
   useAuth: mockUseAuth
 }));
 
-vi.mock("../services/websocket.js", () => ({
+vi.mock("../../services/websocket.js", () => ({
   connectShowtime: mockConnectShowtime
 }));
 
@@ -499,5 +499,55 @@ it("should restore a pending seat selection after returning from login", async (
     });
 
     expect(sessionStorage.getItem(PENDING_KEY)).toBeNull();
+  });
+
+  it.each([
+    ["COMING_SOON", "Coming soon", /Booking opens on/],
+    ["ENDED", "No longer showing", /can no longer be booked/],
+    ["ARCHIVED", "Archived", /no longer available for booking/]
+  ])("should not allow booking a %s movie", async (status, heading, message) => {
+    mockApi.mockImplementation(async (path) => {
+      if (path === "/movies/movie-1") {
+        return {
+          ...movie,
+          status,
+          bookable: false,
+          releaseDate: "2027-01-10",
+          endDate: "2027-02-10"
+        };
+      }
+      if (path === "/showtimes?movieId=movie-1") return showtimes;
+
+      throw new Error(`Unexpected API request: ${path}`);
+    });
+
+    renderMovieDetails();
+
+    expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
+    expect(screen.getByText(message)).toBeInTheDocument();
+
+    // No showtime picker, seat map, or confirm button, and no seat requests.
+    expect(screen.queryByText("Choose a showtime")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Confirm Booking|Login to Confirm/ })).not.toBeInTheDocument();
+    expect(mockApi).not.toHaveBeenCalledWith("/showtimes/showtime-1");
+    expect(mockConnectShowtime).not.toHaveBeenCalled();
+  });
+
+  it("should still allow booking a Now Showing movie that has an end date", async () => {
+    mockApi.mockImplementation(async (path) => {
+      if (path === "/movies/movie-1") {
+        return { ...movie, status: "NOW_SHOWING", bookable: true, releaseDate: "2026-11-01", endDate: "2026-12-31" };
+      }
+      if (path === "/showtimes?movieId=movie-1") return showtimes;
+      if (path === "/showtimes/showtime-1") return showtimeDetails;
+
+      throw new Error(`Unexpected API request: ${path}`);
+    });
+
+    renderMovieDetails();
+
+    expect(await screen.findByText("Choose a showtime")).toBeInTheDocument();
+    expect(screen.getByText(/Showing until/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Login to Confirm/ })).toBeInTheDocument();
   });
 });

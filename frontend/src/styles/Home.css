@@ -111,7 +111,7 @@
 }
 
 /* Luxury Primary Button */
-.btn-primary {
+.button.btn-primary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -130,7 +130,7 @@
   min-height: 50px;
 }
 
-.btn-primary:hover {
+.button.btn-primary:hover {
   background: #fbbf24;
   transform: translateY(-2px);
   box-shadow: 0 15px 30px -5px rgba(251, 191, 36, 0.3);
@@ -590,3 +590,79 @@
   color: #ffffff;
   border-color: var(--navy-deep, #0f172a);
 }
+
+/* ---------- Availability tabs (Now Showing / Coming Soon / Previously Shown) ---------- */
+.status-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.status-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #fff;
+  color: #475569;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.status-tab:hover { border-color: #1e40af; color: #1e40af; }
+
+.status-tab.active {
+  border-color: #1e40af;
+  background: #1e40af;
+  color: #fff;
+}
+
+.status-tab-count {
+  min-width: 1.4rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(100, 116, 139, 0.15);
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.status-tab.active .status-tab-count { background: rgba(255, 255, 255, 0.25); }
+
+.status-tab-note {
+  margin: 0 0 1rem;
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+/* ---------- Movie card status ---------- */
+.movie-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.movie-card-tags .badge { margin: 0.5rem 0; }
+
+.movie-status-chip {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 0.35rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.movie-status-chip.status-now-showing { background: #dcfce7; color: #166534; }
+.movie-status-chip.status-coming-soon { background: #dbeafe; color: #1e40af; }
+.movie-status-chip.status-ended { background: #fef3c7; color: #92400e; }
+
+.movie-card .movie-card-dates { margin: -0.4rem 0 0.85rem; font-size: 0.78rem; }
+
+.movie-card.is-ended img { filter: grayscale(0.7); opacity: 0.85; }

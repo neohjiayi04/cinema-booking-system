@@ -14,11 +14,11 @@ const { mockApi, mockConnectShowtime, mockSocketClose } = vi.hoisted(() => ({
   mockSocketClose: vi.fn()
 }));
 
-vi.mock("../services/api.js", () => ({
+vi.mock("../../services/api.js", () => ({
   api: mockApi
 }));
 
-vi.mock("../services/websocket.js", () => ({
+vi.mock("../../services/websocket.js", () => ({
   connectShowtime: mockConnectShowtime
 }));
 

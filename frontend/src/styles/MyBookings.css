@@ -320,3 +320,108 @@
     border-top: 2px dashed var(--border-color);
   }
 }
+
+/*Active Tab Styling*/
+/* Booking History Tabs */
+.booking-tabs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.booking-tab {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.booking-tab:hover {
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.booking-tab.active {
+  background: #eff6ff;
+  border-color: #2563eb;
+  color: #2563eb;
+}
+
+.booking-tab span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 20px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 12px;
+}
+
+.booking-tab.active span {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+/* Booking Status */
+.booking-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.booking-status-pill.upcoming {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.booking-status-pill.completed {
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.booking-status-pill.cancelled {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.booking-status-pill .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ticket-history-label {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .booking-tabs {
+    width: 100%;
+  }
+
+  .booking-tab {
+    flex: 1;
+    justify-content: center;
+    padding: 9px 10px;
+    font-size: 12px;
+  }
+}

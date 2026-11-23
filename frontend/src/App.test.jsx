@@ -37,27 +37,27 @@ vi.mock("./pages/Register.jsx", () => ({
   default: () => <h1>Register Page</h1>
 }));
 
-vi.mock("./pages/Home.jsx", () => ({
+vi.mock("./pages/customer/Home.jsx", () => ({
   default: () => <h1>Home Page</h1>
 }));
 
-vi.mock("./pages/MovieDetails.jsx", () => ({
+vi.mock("./pages/customer/MovieDetails.jsx", () => ({
   default: () => <h1>Movie Details Page</h1>
 }));
 
-vi.mock("./pages/SeatBooking.jsx", () => ({
+vi.mock("./pages/customer/SeatBooking.jsx", () => ({
   default: () => <h1>Seat Booking Page</h1>
 }));
 
-vi.mock("./pages/BookingConfirmation.jsx", () => ({
+vi.mock("./pages/customer/BookingConfirmation.jsx", () => ({
   default: () => <h1>Booking Confirmation Page</h1>
 }));
 
-vi.mock("./pages/MyBookings.jsx", () => ({
+vi.mock("./pages/customer/MyBookings.jsx", () => ({
   default: () => <h1>My Bookings Page</h1>
 }));
 
-vi.mock("./pages/UserProfile.jsx", () => ({
+vi.mock("./pages/customer/UserProfile.jsx", () => ({
   default: () => <h1>User Profile Page</h1>
 }));
 

@@ -83,3 +83,32 @@ describe("MovieCard Component", () => {
     expect(container.querySelector(".card-body")).toBeInTheDocument();
   });
 });
+
+describe("MovieCard availability status", () => {
+  it("should show a Now Showing chip", () => {
+    renderMovieCard({ ...movie, status: "NOW_SHOWING" });
+
+    expect(screen.getByText("Now Showing")).toBeInTheDocument();
+  });
+
+  it("should show a Coming Soon chip with the opening date", () => {
+    renderMovieCard({ ...movie, status: "COMING_SOON", releaseDate: "2027-01-10" });
+
+    expect(screen.getByText("Coming Soon")).toBeInTheDocument();
+    expect(screen.getByText("Opens 10 Jan 2027")).toBeInTheDocument();
+  });
+
+  it("should dim an ended movie and show when it stopped showing", () => {
+    const { container } = renderMovieCard({ ...movie, status: "ENDED", endDate: "2026-10-01" });
+
+    expect(screen.getByText("Ended")).toBeInTheDocument();
+    expect(screen.getByText("Showed until 1 Oct 2026")).toBeInTheDocument();
+    expect(container.querySelector("article")).toHaveClass("is-ended");
+  });
+
+  it("should still link every status to the details page", () => {
+    renderMovieCard({ ...movie, status: "COMING_SOON" });
+
+    expect(screen.getByRole("link", { name: "View Details" })).toHaveAttribute("href", "/movies/movie-123");
+  });
+});

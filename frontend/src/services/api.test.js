@@ -21,7 +21,7 @@ describe("API Service", () => {
     const result = await api("/movies");
 
     expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:3000/api/movies",
+      "http://localhost:3001/api/movies",
       expect.objectContaining({
         headers: {
           "Content-Type": "application/json"
@@ -43,7 +43,7 @@ describe("API Service", () => {
     await api("/profile");
 
     expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:3000/api/profile",
+      "http://localhost:3001/api/profile",
       expect.objectContaining({
         headers: {
           "Content-Type": "application/json",
@@ -68,7 +68,7 @@ describe("API Service", () => {
     });
 
     expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:3000/api/movies",
+      "http://localhost:3001/api/movies",
       expect.objectContaining({
         method: "POST",
         headers: {

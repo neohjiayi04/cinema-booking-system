@@ -86,15 +86,19 @@ describe("Showtimes Admin Page", () => {
     vi.unstubAllGlobals();
   });
 
-  it("should display the page heading and description", () => {
+  it("should display the page heading and description", async () => {
     renderShowtimes();
+
+    await waitForShowtimes();
 
     expect(
       screen.getByRole("heading", { name: "Showtimes" })
     ).toBeInTheDocument();
 
     expect(
-      screen.getByText("Manage your cinema showtimes and schedules.")
+      screen.getByText(
+        "Schedule movies in your cinema halls and manage ticket prices."
+      )
     ).toBeInTheDocument();
   });
 
@@ -143,8 +147,10 @@ describe("Showtimes Admin Page", () => {
     ).toBeInTheDocument();
   });
 
-  it("should display the default ticket price", () => {
+  it("should display the default ticket price", async () => {
     renderShowtimes();
+
+    await waitForShowtimes();
 
     expect(screen.getByLabelText("Price (RM)")).toHaveValue(18);
   });
@@ -167,8 +173,12 @@ describe("Showtimes Admin Page", () => {
 
     expect(tableContent.getByText("2026-11-20")).toBeInTheDocument();
     expect(tableContent.getByText("2026-11-21")).toBeInTheDocument();
-    expect(tableContent.getByText("19:30")).toBeInTheDocument();
-    expect(tableContent.getByText("21:00")).toBeInTheDocument();
+
+    // The component formats times with toLocaleTimeString (e.g. "7:30 PM"),
+    // so match the formatted output and tolerate locale whitespace differences.
+    expect(tableContent.getByText(/^7:30\s*PM$/i)).toBeInTheDocument();
+    expect(tableContent.getByText(/^9:00\s*PM$/i)).toBeInTheDocument();
+
     expect(tableContent.getByText("RM 18.00")).toBeInTheDocument();
     expect(tableContent.getByText("RM 15.50")).toBeInTheDocument();
   });
@@ -179,7 +189,7 @@ describe("Showtimes Admin Page", () => {
     await waitForShowtimes();
 
     expect(
-      screen.getByText("2 showtimes scheduled")
+      screen.getByText("2 showtimes configured")
     ).toBeInTheDocument();
   });
 
@@ -199,11 +209,11 @@ describe("Showtimes Admin Page", () => {
     ).toBeInTheDocument();
 
     expect(
-      screen.getByText("Create your first showtime using the form above.")
+      screen.getByText("Add your first showtime using the form above.")
     ).toBeInTheDocument();
 
     expect(
-      screen.getByText("0 showtimes scheduled")
+      screen.getByText("0 showtimes configured")
     ).toBeInTheDocument();
   });
 
@@ -407,7 +417,7 @@ describe("Showtimes Admin Page", () => {
     });
 
     expect(globalThis.confirm).toHaveBeenCalledWith(
-      "Delete this showtime?"
+      expect.stringContaining('Delete the showtime for "Interstellar"')
     );
   });
 
@@ -423,7 +433,7 @@ describe("Showtimes Admin Page", () => {
     );
 
     expect(globalThis.confirm).toHaveBeenCalledWith(
-      "Delete this showtime?"
+      expect.stringContaining('Delete the showtime for "Interstellar"')
     );
 
     expect(mockApi).not.toHaveBeenCalledWith("/showtimes/showtime1", {
@@ -468,5 +478,4 @@ describe("Showtimes Admin Page", () => {
       method: "DELETE",
     });
   });
-
 });

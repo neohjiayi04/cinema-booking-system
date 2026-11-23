@@ -1,5 +1,6 @@
 import { connectDb, getDb } from "./db.js";
 import { hashPassword } from "./auth.js";
+import { normalizeTitle, releaseYear, todayString, addDays } from "./utils/movieUtils.js";
 
 await connectDb();
 const db = getDb();
@@ -44,49 +45,62 @@ for (const hall of hallSeed) {
   halls.push(await ensureRecord("halls", { name: hall.name }, hall));
 }
 
+const today = todayString();
+
 const movieSeed = [
   {
     title: "Neon Horizon",
     description: "A science-fiction adventure beyond the edge of the known world.",
-    genre: "Sci-Fi",
-    duration: 128,
-    rating: "PG-13",
+    genre: "Sci-Fi", duration: 128, rating: "PG-13",
     poster: "https://placehold.co/400x600?text=Neon+Horizon",
-    releaseDate: "2026-10-01",
-    status: "NOW_SHOWING"
+    releaseDate: addDays(today, -10), endDate: addDays(today, 50)
   },
   {
     title: "The Last Signal",
     description: "A suspense thriller about a mysterious transmission.",
-    genre: "Thriller",
-    duration: 112,
-    rating: "PG-13",
+    genre: "Thriller", duration: 112, rating: "PG-13",
     poster: "https://placehold.co/400x600?text=The+Last+Signal",
-    releaseDate: "2026-09-25",
-    status: "NOW_SHOWING"
+    releaseDate: addDays(today, -5), endDate: addDays(today, 35)
   },
   {
     title: "Moonlight Avenue",
     description: "A warm romantic drama set in a city that never sleeps.",
-    genre: "Drama",
-    duration: 105,
-    rating: "PG",
+    genre: "Drama", duration: 105, rating: "PG",
     poster: "https://placehold.co/400x600?text=Moonlight+Avenue",
-    releaseDate: "2026-09-18",
-    status: "NOW_SHOWING"
+    releaseDate: addDays(today, -3), endDate: addDays(today, 25)
+  },
+  {
+    title: "Starfall Rising",
+    description: "An epic fantasy about the last star falling to earth.",
+    genre: "Fantasy", duration: 140, rating: "PG",
+    poster: "https://placehold.co/400x600?text=Starfall+Rising",
+    releaseDate: addDays(today, 10), endDate: addDays(today, 60)
+  },
+  {
+    title: "Midnight Express Line",
+    description: "A crime caper aboard an overnight train.",
+    genre: "Crime", duration: 118, rating: "R",
+    poster: "https://placehold.co/400x600?text=Midnight+Express+Line",
+    releaseDate: addDays(today, -20), endDate: addDays(today, 20)
   }
 ];
 
 const movies = [];
 for (const movie of movieSeed) {
-  movies.push(await ensureRecord("movies", { title: movie.title }, movie));
+  movies.push(await ensureRecord("movies", { title: movie.title }, {
+    ...movie,
+    archived: false,
+    titleKey: normalizeTitle(movie.title),
+    releaseYear: releaseYear(movie),
+    createdAt: new Date()
+  }));
 }
 
 const showtimeSeed = [
-  { movieTitle: "Neon Horizon", hallName: "Hall 1", date: "2026-10-10", startTime: "14:00", price: 18, status: "ACTIVE" },
-  { movieTitle: "Neon Horizon", hallName: "Hall 2", date: "2026-10-10", startTime: "20:30", price: 22, status: "ACTIVE" },
-  { movieTitle: "The Last Signal", hallName: "Hall 3", date: "2026-10-11", startTime: "17:00", price: 20, status: "ACTIVE" },
-  { movieTitle: "Moonlight Avenue", hallName: "Hall 1", date: "2026-10-11", startTime: "19:30", price: 18, status: "ACTIVE" }
+  { movieTitle: "Neon Horizon", hallName: "Hall 1", date: addDays(today, 1), startTime: "14:00", price: 18, status: "ACTIVE" },
+  { movieTitle: "Neon Horizon", hallName: "Hall 2", date: addDays(today, 1), startTime: "20:30", price: 22, status: "ACTIVE" },
+  { movieTitle: "The Last Signal", hallName: "Hall 3", date: addDays(today, 2), startTime: "17:00", price: 20, status: "ACTIVE" },
+  { movieTitle: "Moonlight Avenue", hallName: "Hall 1", date: addDays(today, 2), startTime: "19:30", price: 18, status: "ACTIVE" }
 ];
 
 for (const showtime of showtimeSeed) {

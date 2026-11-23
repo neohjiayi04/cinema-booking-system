@@ -437,3 +437,21 @@
     text-align: left;
   }
 }
+
+/* ---------- Not-bookable status panel (coming soon / ended / archived) ---------- */
+.combined-status-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: #f8fafc;
+}
+
+.combined-status-panel h2 { margin: 0; }
+.combined-status-panel p { margin: 0; color: #475569; }
+.combined-status-panel.status-coming-soon { border-color: #bfdbfe; background: #eff6ff; }
+.combined-status-panel.status-ended,
+.combined-status-panel.status-archived { border-color: #fde68a; background: #fffbeb; }

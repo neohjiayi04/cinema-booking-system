@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../services/api.js";
 
-const EMPTY_FORM = { name: "", rows: 5, seatsPerRow: 8 };
+const EMPTY_FORM = {
+  name: "",
+  rows: 5,
+  seatsPerRow: 8,
+  cleaningMinutes: 20,
+  status: "ACTIVE",
+};
+
+const HALL_STATUSES = ["ACTIVE", "MAINTENANCE", "INACTIVE"];
 
 export default function Halls() {
   const [halls, setHalls] = useState([]);
@@ -29,20 +37,35 @@ export default function Halls() {
 
   useEffect(() => {
     let cancelled = false;
+
     api("/halls")
-      .then((data) => { if (!cancelled) setHalls(data); })
-      .catch((err) => { if (!cancelled) setError(err.message || "Unable to load halls."); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then((data) => {
+        if (!cancelled) setHalls(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message || "Unable to load halls.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   function setField(field) {
-    return (event) => setForm((prev) => ({ ...prev, [field]: event.target.value }));
-    
+    return (event) =>
+      setForm((prev) => ({
+        ...prev,
+        [field]: event.target.value,
+      }));
   }
 
   function resetForm() {
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM });
     setEditingId(null);
   }
 
@@ -56,12 +79,15 @@ export default function Halls() {
       name: form.name.trim(),
       rows: Number(form.rows),
       seatsPerRow: Number(form.seatsPerRow),
+      cleaningMinutes: Number(form.cleaningMinutes),
+      status: String(form.status || "ACTIVE").toUpperCase(),
     };
 
     if (!payload.name) {
       setError("Please enter a hall name.");
       return;
     }
+
     if (
       !Number.isInteger(payload.rows) ||
       !Number.isInteger(payload.seatsPerRow) ||
@@ -72,21 +98,38 @@ export default function Halls() {
       return;
     }
 
+    if (
+      !Number.isInteger(payload.cleaningMinutes) ||
+      payload.cleaningMinutes < 0
+    ) {
+      setError("Cleaning time must be a whole number of 0 minutes or more.");
+      return;
+    }
+
+    if (!HALL_STATUSES.includes(payload.status)) {
+      setError("Please select a valid hall status.");
+      return;
+    }
+
     setSaving(true);
+
     try {
       if (isEditing) {
         await api(`/halls/${editingId}`, {
           method: "PUT",
           body: JSON.stringify(payload),
         });
+
         setMessage(`"${payload.name}" has been updated.`);
       } else {
         await api("/halls", {
           method: "POST",
           body: JSON.stringify(payload),
         });
+
         setMessage(`"${payload.name}" has been added.`);
       }
+
       resetForm();
       await load();
     } catch (err) {
@@ -101,26 +144,43 @@ export default function Halls() {
     setMessage("");
     setError("");
     setEditingId(hall._id);
+
     setForm({
       name: hall.name,
       rows: hall.rows,
       seatsPerRow: hall.seatsPerRow,
+      cleaningMinutes: hall.cleaningMinutes ?? 20,
+      status: hall.status ?? "ACTIVE",
     });
+
     requestAnimationFrame(() => {
-      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      formRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+
       nameRef.current?.focus();
     });
   }
 
   /* DELETE */
   async function remove(hall) {
-    if (!window.confirm(`Delete "${hall.name}"? This cannot be undone.`)) return;
+    if (!window.confirm(`Delete "${hall.name}"? This cannot be undone.`)) {
+      return;
+    }
 
     setMessage("");
     setError("");
+
     try {
-      await api(`/halls/${hall._id}`, { method: "DELETE" });
-      if (editingId === hall._id) resetForm();
+      await api(`/halls/${hall._id}`, {
+        method: "DELETE",
+      });
+
+      if (editingId === hall._id) {
+        resetForm();
+      }
+
       setMessage(`"${hall.name}" has been deleted.`);
       await load();
     } catch (err) {
@@ -128,8 +188,35 @@ export default function Halls() {
     }
   }
 
-  const totalSeats = halls.reduce((sum, h) => sum + h.rows * h.seatsPerRow, 0);
-  const previewSeats = (Number(form.rows) || 0) * (Number(form.seatsPerRow) || 0);
+  const totalSeats = halls.reduce(
+    (sum, hall) => sum + hall.rows * hall.seatsPerRow,
+    0
+  );
+
+  const previewSeats =
+    (Number(form.rows) || 0) * (Number(form.seatsPerRow) || 0);
+
+  function statusLabel(status) {
+    switch (status) {
+      case "MAINTENANCE":
+        return "Maintenance";
+      case "INACTIVE":
+        return "Inactive";
+      default:
+        return "Active";
+    }
+  }
+
+  function statusClass(status) {
+    switch (status) {
+      case "MAINTENANCE":
+        return "admin-status-warning";
+      case "INACTIVE":
+        return "admin-status-danger";
+      default:
+        return "admin-status-success";
+    }
+  }
 
   return (
     <section>
@@ -137,17 +224,26 @@ export default function Halls() {
         <div>
           <h1>Halls</h1>
           <p className="admin-page-description">
-            Manage and view all cinema halls.
+            Manage cinema halls, seating capacity, cleaning time, and
+            availability status.
           </p>
         </div>
       </div>
+
       {message && (
-        <div className="admin-alert admin-alert-success admin-hall-alert" role="status">
+        <div
+          className="admin-alert admin-alert-success admin-hall-alert"
+          role="status"
+        >
           {message}
         </div>
       )}
+
       {error && (
-        <div className="admin-alert admin-alert-error admin-hall-alert" role="alert">
+        <div
+          className="admin-alert admin-alert-error admin-hall-alert"
+          role="alert"
+        >
           {error}
         </div>
       )}
@@ -159,12 +255,14 @@ export default function Halls() {
             <h2 className="admin-section-title">
               {isEditing ? "Edit Hall" : "Add New Hall"}
             </h2>
+
             <p className="admin-panel-subtitle">
               {isEditing
-                ? "Update the hall details, then save your changes."
-                : "Set the name and seating layout for a new hall."}
+                ? "Update the hall details, availability, and seating layout."
+                : "Set the hall name, seating layout, cleaning time, and availability."}
             </p>
           </div>
+
           {previewSeats > 0 && (
             <span className="admin-status admin-status-info">
               {previewSeats} seats
@@ -176,7 +274,10 @@ export default function Halls() {
           <form className="admin-hall-form" onSubmit={submit}>
             <div className="admin-form-grid admin-form-grid-3">
               <div className="admin-field">
-                <label className="admin-label" htmlFor="hall-name">Hall name</label>
+                <label className="admin-label" htmlFor="hall-name">
+                  Hall name
+                </label>
+
                 <input
                   id="hall-name"
                   ref={nameRef}
@@ -190,7 +291,10 @@ export default function Halls() {
               </div>
 
               <div className="admin-field">
-                <label className="admin-label" htmlFor="hall-rows">Rows</label>
+                <label className="admin-label" htmlFor="hall-rows">
+                  Rows
+                </label>
+
                 <input
                   id="hall-rows"
                   className="admin-input"
@@ -205,7 +309,10 @@ export default function Halls() {
               </div>
 
               <div className="admin-field">
-                <label className="admin-label" htmlFor="hall-seats">Seats per row</label>
+                <label className="admin-label" htmlFor="hall-seats">
+                  Seats per row
+                </label>
+
                 <input
                   id="hall-seats"
                   className="admin-input"
@@ -218,7 +325,62 @@ export default function Halls() {
                   required
                 />
               </div>
+
+              <div className="admin-field">
+                <label
+                  className="admin-label"
+                  htmlFor="hall-cleaning-minutes"
+                >
+                  Cleaning time (minutes)
+                </label>
+
+                <div className="admin-input-with-suffix">
+                  <input
+                    id="hall-cleaning-minutes"
+                    className="admin-input"
+                    type="number"
+                    min="0"
+                    max="180"
+                    placeholder="20"
+                    value={form.cleaningMinutes}
+                    onChange={setField("cleaningMinutes")}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="admin-field">
+                <label className="admin-label" htmlFor="hall-status">
+                  Status
+                </label>
+
+                <select
+                  id="hall-status"
+                  className="admin-input"
+                  value={form.status}
+                  onChange={setField("status")}
+                  required
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="MAINTENANCE">Maintenance</option>
+                  <option value="INACTIVE">Inactive</option>
+                </select>
+              </div>
             </div>
+
+            {form.status === "MAINTENANCE" && (
+              <div className="admin-alert admin-alert-warning">
+                <strong>Maintenance mode:</strong> this hall cannot receive
+                new showtimes or bookings while it is under maintenance.
+              </div>
+            )}
+
+            {form.status === "INACTIVE" && (
+              <div className="admin-alert admin-alert-warning">
+                <strong>Inactive hall:</strong> this hall cannot receive new
+                showtimes or bookings while it is inactive.
+              </div>
+            )}
 
             <div className="admin-form-actions">
               <button
@@ -226,7 +388,11 @@ export default function Halls() {
                 className="admin-btn admin-btn-primary"
                 disabled={saving}
               >
-                {saving ? "Saving..." : isEditing ? "Save Changes" : "+ Add Hall"}
+                {saving
+                  ? "Saving..."
+                  : isEditing
+                    ? "Save Changes"
+                    : "+ Add Hall"}
               </button>
 
               {isEditing && (
@@ -249,6 +415,7 @@ export default function Halls() {
         <div className="admin-panel-header">
           <div>
             <h2 className="admin-section-title">All Halls</h2>
+
             <p className="admin-panel-subtitle">
               {halls.length} {halls.length === 1 ? "hall" : "halls"} configured
             </p>
@@ -261,7 +428,10 @@ export default function Halls() {
           </div>
         ) : halls.length === 0 ? (
           <div className="admin-empty-state">
-            <div className="admin-empty-icon" aria-hidden="true">▤</div>
+            <div className="admin-empty-icon" aria-hidden="true">
+              ▤
+            </div>
+
             <h3>No halls yet</h3>
             <p>Add your first hall using the form above.</p>
           </div>
@@ -275,41 +445,71 @@ export default function Halls() {
                     <th>Rows</th>
                     <th>Seats / row</th>
                     <th>Total seats</th>
+                    <th>Cleaning</th>
+                    <th>Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
+
                 <tbody>
-                  {halls.map((hall) => (
-                    <tr
-                      key={hall._id}
-                      className={hall._id === editingId ? "is-editing" : ""}
-                    >
-                      <td className="admin-cell-primary">{hall.name}</td>
-                      <td>{hall.rows}</td>
-                      <td>{hall.seatsPerRow}</td>
-                      <td>
-                        <strong>{hall.rows * hall.seatsPerRow}</strong>
-                      </td>
-                      <td>
-                        <div className="admin-table-actions">
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-secondary admin-btn-sm"
-                            onClick={() => startEdit(hall)}
+                  {halls.map((hall) => {
+                    const status = hall.status ?? "ACTIVE";
+
+                    return (
+                      <tr
+                        key={hall._id}
+                        className={
+                          hall._id === editingId ? "is-editing" : ""
+                        }
+                      >
+                        <td className="admin-cell-primary">
+                          {hall.name}
+                        </td>
+
+                        <td>{hall.rows}</td>
+
+                        <td>{hall.seatsPerRow}</td>
+
+                        <td>
+                          <strong>
+                            {hall.rows * hall.seatsPerRow}
+                          </strong>
+                        </td>
+
+                        <td>
+                          {hall.cleaningMinutes ?? 20} min
+                        </td>
+
+                        <td>
+                          <span
+                            className={`admin-status ${statusClass(status)}`}
                           >
-                            Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-danger admin-btn-sm"
-                            onClick={() => remove(hall)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                            {statusLabel(status)}
+                          </span>
+                        </td>
+
+                        <td>
+                          <div className="admin-table-actions">
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn-secondary admin-btn-sm"
+                              onClick={() => startEdit(hall)}
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn-danger admin-btn-sm"
+                              onClick={() => remove(hall)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

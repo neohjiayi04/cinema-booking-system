@@ -11,6 +11,32 @@ import {
   requireAuth,
   requireAdmin
 } from "./auth.js";
+import {
+  MOVIE_STATUS,
+  decorateMovie,
+  getMovieStatus,
+  bookingBlockedMessage,
+  normalizeTitle,
+  releaseYear,
+  validateMovie,
+  pickMovieFields,
+  showtimeDateProblem,
+  todayString
+} from "./utils/movieUtils.js";
+import {
+  HALL_STATUS,
+  decorateHall,
+  hallStatus,
+  isValidTime,
+  isValidDate,
+  isShowtimePast,
+  isShowtimeUpcoming,
+  findShowtimeConflict,
+  conflictMessage,
+  pickHallFields,
+  validateHall
+} from "./utils/showtimeUtils.js";
+import { generateValidSeats } from "./utils/seatUtils.js";
 
 const app = express();
 app.use(cors({ origin: true }));
@@ -18,6 +44,81 @@ app.use(express.json());
 
 function id(value) {
   return new ObjectId(value);
+}
+
+function isObjectId(value) {
+  return ObjectId.isValid(value);
+}
+
+function badId(res, label) {
+  return res.status(400).json({ message: `Invalid ${label} id.` });
+}
+
+async function getHallBookingCount(hallId) {
+  const db = getDb();
+  const showtimeIds = await db.collection("showtimes")
+    .find({ hallId }, { projection: { _id: 1 } })
+    .map(item => item._id)
+    .toArray();
+  if (!showtimeIds.length) return 0;
+  return db.collection("bookings").countDocuments({
+    showtimeId: { $in: showtimeIds }
+  });
+}
+
+async function getBookedSeatsForHall(hallId) {
+  const db = getDb();
+  const showtimeIds = await db.collection("showtimes")
+    .find({ hallId }, { projection: { _id: 1 } })
+    .map(item => item._id)
+    .toArray();
+  if (!showtimeIds.length) return [];
+
+  const bookings = await db.collection("bookings")
+    .find({ showtimeId: { $in: showtimeIds }, status: "CONFIRMED" }, { projection: { seats: 1 } })
+    .toArray();
+  return [...new Set(bookings.flatMap(item => item.seats || []))];
+}
+
+async function findShowtimeHallConflict(candidate, excludeId = null) {
+  const db = getDb();
+  const filter = { hallId: candidate.hallId, date: candidate.date };
+  if (excludeId) filter._id = { $ne: excludeId };
+
+  const rows = await db.collection("showtimes").aggregate([
+    { $match: filter },
+    {
+      $lookup: {
+        from: "movies",
+        localField: "movieId",
+        foreignField: "_id",
+        as: "movie"
+      }
+    },
+    { $unwind: "$movie" },
+    {
+      $project: {
+        _id: 1,
+        date: 1,
+        startTime: 1,
+        duration: "$movie.duration",
+        title: "$movie.title"
+      }
+    }
+  ]).toArray();
+
+  const cleaningMinutes = 20;
+  return findShowtimeConflict(candidate, rows, cleaningMinutes);
+}
+
+function validateShowtimeInput({ date, startTime, price }) {
+  if (!isValidDate(date)) return "Please provide a valid showtime date.";
+  if (!isValidTime(startTime)) return "Please provide a valid start time (HH:MM).";
+  const numericPrice = Number(price);
+  if (!Number.isFinite(numericPrice) || numericPrice <= 0) {
+    return "Price must be a number greater than 0.";
+  }
+  return null;
 }
 
 function safeUser(user) {
@@ -150,80 +251,267 @@ app.put("/api/auth/me", requireAuth, async (req, res) => {
 });
 
 // ---------------- MOVIES ----------------
-app.get("/api/movies", async (_req, res) => {
+// Statuses (COMING_SOON / NOW_SHOWING / ENDED) are calculated from the start and
+// end dates on every request; only ARCHIVED is stored (archived: true).
+
+// All bookings (any status) that belong to a movie, through its showtimes.
+async function countBookingsForMovie(movieId) {
+  const db = getDb();
+  const showtimeIds = await db.collection("showtimes")
+    .find({ movieId }, { projection: { _id: 1 } })
+    .map(showtime => showtime._id)
+    .toArray();
+
+  if (!showtimeIds.length) return 0;
+
+  return db.collection("bookings").countDocuments({ showtimeId: { $in: showtimeIds } });
+}
+
+// Same title (ignoring case, spacing and punctuation) released in the same year.
+async function findDuplicateMovie(movie, excludeId = null) {
+  const filter = {
+    titleKey: normalizeTitle(movie.title),
+    releaseYear: releaseYear(movie)
+  };
+  if (excludeId) filter._id = { $ne: excludeId };
+  return getDb().collection("movies").findOne(filter);
+}
+
+const duplicateMessage = existing =>
+  `A movie called "${existing.title}" already exists for this release year. Edit that record instead of adding a duplicate.`;
+
+// Public list. Archived movies are hidden. Optional ?status=NOW_SHOWING,COMING_SOON,ENDED
+app.get("/api/movies", async (req, res) => {
+  const today = todayString();
+  const wanted = String(req.query.status || "")
+    .split(",")
+    .map(value => value.trim().toUpperCase())
+    .filter(Boolean);
+
   const movies = await getDb().collection("movies")
     .find({})
     .sort({ releaseDate: -1 })
     .toArray();
 
-  res.json(movies);
+  res.json(
+    movies
+      .map(movie => decorateMovie(movie, today))
+      .filter(movie => movie.status !== MOVIE_STATUS.ARCHIVED)
+      .filter(movie => !wanted.length || wanted.includes(movie.status))
+  );
+});
+
+// Admin list: every movie, archived included, with its booking count.
+app.get("/api/admin/movies", requireAuth, requireAdmin, async (_req, res) => {
+  const db = getDb();
+  const today = todayString();
+
+  const [movies, showtimes, perShowtime] = await Promise.all([
+    db.collection("movies").find({}).sort({ releaseDate: -1 }).toArray(),
+    db.collection("showtimes").find({}, { projection: { _id: 1, movieId: 1 } }).toArray(),
+    db.collection("bookings").aggregate([
+      { $group: { _id: "$showtimeId", count: { $sum: 1 } } }
+    ]).toArray()
+  ]);
+
+  const movieByShowtime = new Map(showtimes.map(s => [String(s._id), String(s.movieId)]));
+  const bookingsByMovie = new Map();
+  for (const row of perShowtime) {
+    const movieKey = movieByShowtime.get(String(row._id));
+    if (movieKey) bookingsByMovie.set(movieKey, (bookingsByMovie.get(movieKey) || 0) + row.count);
+  }
+
+  res.json(
+    movies.map(movie => ({
+      ...decorateMovie(movie, today),
+      bookingCount: bookingsByMovie.get(String(movie._id)) || 0
+    }))
+  );
 });
 
 app.get("/api/movies/:id", async (req, res) => {
   const movie = await getDb().collection("movies")
     .findOne({ _id: id(req.params.id) });
 
-  if (!movie) return res.status(404).json({ message: "Movie not found" });
+  if (!movie || movie.archived === true) return res.status(404).json({ message: "Movie not found" });
 
-  res.json(movie);
+  res.json(decorateMovie(movie));
 });
 
 app.post("/api/movies", requireAuth, requireAdmin, async (req, res) => {
-  const {
-    title, description, genre, duration,
-    rating, poster, releaseDate, status
-  } = req.body;
+  const input = pickMovieFields(req.body);
 
-  if (!title) return res.status(400).json({ message: "Title is required" });
+  if (!input.title) return res.status(400).json({ message: "Title is required" });
 
   const movie = {
-    title,
-    description: description || "",
-    genre: genre || "General",
-    duration: Number(duration || 120),
-    rating: rating || "PG",
-    poster: poster || "",
-    releaseDate: releaseDate || new Date().toISOString().slice(0, 10),
-    status: status || "NOW_SHOWING",
+    title: input.title,
+    description: input.description || "",
+    genre: input.genre || "General",
+    duration: input.duration ?? 120,
+    rating: input.rating || "PG",
+    poster: input.poster || "",
+    releaseDate: input.releaseDate || todayString(),
+    endDate: input.endDate || null,
+    featured: input.featured === true,
+    archived: false,
     createdAt: new Date()
   };
 
-  const result = await getDb().collection("movies").insertOne(movie);
-  movie._id = result.insertedId;
+  const problem = validateMovie(movie);
+  if (problem) return res.status(400).json({ message: problem });
 
-  res.status(201).json(movie);
+  const duplicate = await findDuplicateMovie(movie);
+  if (duplicate) {
+    return res.status(409).json({ message: duplicateMessage(duplicate), code: "DUPLICATE_MOVIE" });
+  }
+
+  movie.titleKey = normalizeTitle(movie.title);
+  movie.releaseYear = releaseYear(movie);
+
+  try {
+    const result = await getDb().collection("movies").insertOne(movie);
+    movie._id = result.insertedId;
+  } catch (error) {
+    // Two admins adding the same movie at the same moment: the unique index catches it.
+    if (error?.code === 11000) {
+      return res.status(409).json({ message: "This movie already exists for this release year.", code: "DUPLICATE_MOVIE" });
+    }
+    throw error;
+  }
+
+  res.status(201).json(decorateMovie(movie));
 });
 
 app.put("/api/movies/:id", requireAuth, requireAdmin, async (req, res) => {
-  const allowed = [
-    "title", "description", "genre", "duration",
-    "rating", "poster", "releaseDate", "status"
-  ];
+  const movies = getDb().collection("movies");
+  const movieId = id(req.params.id);
 
-  const update = {};
+  const existing = await movies.findOne({ _id: movieId });
+  if (!existing) return res.status(404).json({ message: "Movie not found" });
 
-  for (const key of allowed) {
-    if (req.body[key] !== undefined) update[key] = req.body[key];
+  // `status` is calculated, so any status sent by the client is ignored.
+  const update = pickMovieFields(req.body);
+  const merged = { ...existing, ...update };
+
+  const problem = validateMovie(merged, existing);
+  if (problem) return res.status(400).json({ message: problem });
+
+  // Changing the movie's availability must not strand existing showtimes outside
+  // the new date range. Move/delete those showtimes first, then edit the movie.
+  const existingShowtimes = await getDb().collection("showtimes")
+    .find({ movieId }, { projection: { date: 1 } })
+    .toArray();
+  const invalidShowtime = existingShowtimes.find(showtime => {
+    const day = String(showtime.date).slice(0, 10);
+    return day < merged.releaseDate || (merged.endDate && day > merged.endDate);
+  });
+  if (invalidShowtime) {
+    return res.status(409).json({
+      message: `Movie dates cannot be changed because showtime ${String(invalidShowtime.date).slice(0, 10)} would fall outside the movie's availability.`,
+      code: "MOVIE_DATES_CONFLICT_WITH_SHOWTIMES"
+    });
   }
 
+  const duplicate = await findDuplicateMovie(merged, movieId);
+  if (duplicate) {
+    return res.status(409).json({ message: duplicateMessage(duplicate), code: "DUPLICATE_MOVIE" });
+  }
+
+  update.titleKey = normalizeTitle(merged.title);
+  update.releaseYear = releaseYear(merged);
+
+  let result;
+  try {
+    result = await movies.findOneAndUpdate(
+      { _id: movieId },
+      { $set: update },
+      { returnDocument: "after" }
+    );
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ message: "This movie already exists for this release year.", code: "DUPLICATE_MOVIE" });
+    }
+    throw error;
+  }
+
+  if (!result) return res.status(404).json({ message: "Movie not found" });
+
+  res.json(decorateMovie(result));
+});
+
+// Archive instead of delete: hides the movie from customers and blocks booking.
+app.put("/api/movies/:id/archive", requireAuth, requireAdmin, async (req, res) => {
+  const movies = getDb().collection("movies");
+  const movieId = id(req.params.id);
+
+  const movie = await movies.findOne({ _id: movieId });
+
+  if (!movie) {
+    return res.status(404).json({ message: "Movie not found" });
+  }
+
+  const bookingCount = await countBookingsForMovie(movieId);
+
+  if (bookingCount > 0) {
+    return res.status(409).json({
+      message: `"${movie.title}" has ${bookingCount} existing booking${bookingCount === 1 ? "" : "s"} and can't be archived.`,
+      code: "MOVIE_HAS_BOOKINGS",
+      bookingCount
+    });
+  }
+
+  const result = await movies.findOneAndUpdate(
+    { _id: movieId },
+    {
+      $set: { archived: true, archivedAt: new Date() },
+      $unset: { restoredAt: "" }
+    },
+    { returnDocument: "after" }
+  );
+
+  if (!result) {
+    return res.status(404).json({ message: "Movie not found" });
+  }
+
+  res.json(decorateMovie(result));
+});
+
+// Un-archive. The movie returns to Coming Soon / Now Showing / Ended based on its dates.
+// restoredAt stops the automatic archiver from archiving it again straight away.
+app.put("/api/movies/:id/restore", requireAuth, requireAdmin, async (req, res) => {
   const result = await getDb().collection("movies").findOneAndUpdate(
     { _id: id(req.params.id) },
-    { $set: update },
+    {
+      $set: { archived: false, restoredAt: new Date() },
+      $unset: { archivedAt: "", autoArchived: "" }
+    },
     { returnDocument: "after" }
   );
 
   if (!result) return res.status(404).json({ message: "Movie not found" });
 
-  res.json(result);
+  res.json(decorateMovie(result));
 });
 
 app.delete("/api/movies/:id", requireAuth, requireAdmin, async (req, res) => {
-  const result = await getDb().collection("movies")
-    .deleteOne({ _id: id(req.params.id) });
+  const movies = getDb().collection("movies");
+  const movieId = id(req.params.id);
 
-  if (!result.deletedCount) {
-    return res.status(404).json({ message: "Movie not found" });
+  const movie = await movies.findOne({ _id: movieId });
+  if (!movie) return res.status(404).json({ message: "Movie not found" });
+
+  const bookingCount = await countBookingsForMovie(movieId);
+  if (bookingCount > 0) {
+    return res.status(409).json({
+      message: `"${movie.title}" has ${bookingCount} existing booking${bookingCount === 1 ? "" : "s"} and can't be deleted or archived.`,
+      code: "MOVIE_HAS_BOOKINGS",
+      bookingCount
+    });
   }
+
+  // No bookings, so its (empty) showtimes can safely go with it.
+  await getDb().collection("showtimes").deleteMany({ movieId });
+  await movies.deleteOne({ _id: movieId });
 
   res.json({ message: "Movie deleted" });
 });
@@ -235,59 +523,124 @@ app.get("/api/halls", async (_req, res) => {
     .sort({ name: 1 })
     .toArray();
 
-  res.json(halls);
+  res.json(halls.map(decorateHall));
 });
 
 app.post("/api/halls", requireAuth, requireAdmin, async (req, res) => {
-  const { name, rows, seatsPerRow } = req.body;
-
-  if (!name || !rows || !seatsPerRow) {
-    return res.status(400).json({ message: "Hall data is required" });
-  }
-
-  const hall = {
-    name,
-    rows: Number(rows),
-    seatsPerRow: Number(seatsPerRow),
-    createdAt: new Date()
+  const input = {
+    name: String(req.body.name ?? "").trim(),
+    rows: Number(req.body.rows),
+    seatsPerRow: Number(req.body.seatsPerRow),
+    status: String(req.body.status ?? HALL_STATUS.ACTIVE).toUpperCase()
   };
 
+  const problem = validateHall(input);
+  if (problem) return res.status(400).json({ message: problem });
+
+  const hall = { ...input, createdAt: new Date() };
   const result = await getDb().collection("halls").insertOne(hall);
   hall._id = result.insertedId;
 
-  res.status(201).json(hall);
+  res.status(201).json(decorateHall(hall));
 });
 
 app.put("/api/halls/:id", requireAuth, requireAdmin, async (req, res) => {
-  const update = {};
+  if (!isObjectId(req.params.id)) return badId(res, "hall");
 
-  for (const key of ["name", "rows", "seatsPerRow"]) {
-    if (req.body[key] !== undefined) {
-      update[key] = Number.isNaN(Number(req.body[key]))
-        ? req.body[key]
-        : Number(req.body[key]);
+  const halls = getDb().collection("halls");
+  const hallId = id(req.params.id);
+  const existing = await halls.findOne({ _id: hallId });
+  if (!existing) return res.status(404).json({ message: "Hall not found" });
+
+  const update = pickHallFields(req.body);
+  const merged = {
+    ...existing,
+    ...update,
+    status: update.status ?? hallStatus(existing)
+  };
+
+  const problem = validateHall(merged);
+  if (problem) return res.status(400).json({ message: problem });
+  // A hall cannot be made unavailable while it still has upcoming showtimes.
+  const unavailableStatuses = [HALL_STATUS.MAINTENANCE, HALL_STATUS.INACTIVE];
+
+  if (
+    unavailableStatuses.includes(merged.status) &&
+    hallStatus(existing) === HALL_STATUS.ACTIVE
+  ) {
+    const showtimes = await getDb()
+      .collection("showtimes")
+      .find({ hallId })
+      .toArray();
+
+    const upcomingShowtimes = showtimes.filter(showtime =>
+      isShowtimeUpcoming(showtime)
+    );
+
+    if (upcomingShowtimes.length) {
+      return res.status(409).json({
+        message: `"${existing.name}" has ${upcomingShowtimes.length} upcoming showtime${
+          upcomingShowtimes.length === 1 ? "" : "s"
+        } and cannot be changed to ${merged.status}.`,
+        code: "HALL_HAS_UPCOMING_SHOWTIMES",
+        showtimeCount: upcomingShowtimes.length
+      });
     }
   }
 
-  const result = await getDb().collection("halls").findOneAndUpdate(
-    { _id: id(req.params.id) },
+  const bookedSeats = await getBookedSeatsForHall(hallId);
+  
+  const newLayout = generateValidSeats(merged.rows, merged.seatsPerRow);
+  const seatsOutside = bookedSeats.filter(seat => !newLayout.has(seat));
+  if (seatsOutside.length) {
+    return res.status(409).json({
+      message: `The hall cannot shrink because these booked seats would no longer exist: ${seatsOutside.join(", ")}.`,
+      code: "HALL_BOOKED_SEATS_OUTSIDE_LAYOUT",
+      seats: seatsOutside
+    });
+  }
+
+  const result = await halls.findOneAndUpdate(
+    { _id: hallId },
     { $set: update },
     { returnDocument: "after" }
   );
 
   if (!result) return res.status(404).json({ message: "Hall not found" });
-
-  res.json(result);
+  res.json(decorateHall(result));
 });
 
 app.delete("/api/halls/:id", requireAuth, requireAdmin, async (req, res) => {
-  const result = await getDb().collection("halls")
-    .deleteOne({ _id: id(req.params.id) });
+  if (!isObjectId(req.params.id)) return badId(res, "hall");
 
-  if (!result.deletedCount) {
-    return res.status(404).json({ message: "Hall not found" });
+  const halls = getDb().collection("halls");
+  const hallId = id(req.params.id);
+  const hall = await halls.findOne({ _id: hallId });
+  if (!hall) return res.status(404).json({ message: "Hall not found" });
+
+  const upcoming = await getDb().collection("showtimes")
+    .find({ hallId })
+    .toArray();
+  const upcomingShowtimes = upcoming.filter(showtime => isShowtimeUpcoming(showtime));
+  if (upcomingShowtimes.length) {
+    return res.status(409).json({
+      message: `"${hall.name}" has ${upcomingShowtimes.length} upcoming showtime${upcomingShowtimes.length === 1 ? "" : "s"} and can't be deleted.`,
+      code: "HALL_HAS_UPCOMING_SHOWTIMES",
+      showtimeCount: upcomingShowtimes.length
+    });
   }
 
+  const bookingCount = await getHallBookingCount(hallId);
+  if (bookingCount > 0) {
+    return res.status(409).json({
+      message: `"${hall.name}" has existing bookings and can't be deleted.`,
+      code: "HALL_HAS_BOOKINGS",
+      bookingCount
+    });
+  }
+
+  await getDb().collection("showtimes").deleteMany({ hallId });
+  await halls.deleteOne({ _id: hallId });
   res.json({ message: "Hall deleted" });
 });
 
@@ -302,70 +655,110 @@ app.get("/api/showtimes", async (req, res) => {
     { $sort: { date: 1, startTime: 1 } },
     {
       $lookup: {
-        from: "movies",
-        localField: "movieId",
-        foreignField: "_id",
-        as: "movie"
+        from: "movies", localField: "movieId", foreignField: "_id", as: "movie"
       }
     },
     { $unwind: "$movie" },
     {
       $lookup: {
-        from: "halls",
-        localField: "hallId",
-        foreignField: "_id",
-        as: "hall"
+        from: "halls", localField: "hallId", foreignField: "_id", as: "hall"
       }
     },
     { $unwind: "$hall" }
   ]).toArray();
 
-  res.json(rows);
+  const today = todayString();
+  res.json(rows.map(row => ({
+    ...row,
+    movie: decorateMovie(row.movie, today),
+    hall: decorateHall(row.hall)
+  })));
 });
 
 app.get("/api/showtimes/:id", async (req, res) => {
+  if (!isObjectId(req.params.id)) return badId(res, "showtime");
+
+  const showtimeId = id(req.params.id);
   const rows = await getDb().collection("showtimes").aggregate([
-    { $match: { _id: id(req.params.id) } },
+    { $match: { _id: showtimeId } },
     {
-      $lookup: {
-        from: "movies",
-        localField: "movieId",
-        foreignField: "_id",
-        as: "movie"
-      }
+      $lookup: { from: "movies", localField: "movieId", foreignField: "_id", as: "movie" }
     },
     { $unwind: "$movie" },
     {
-      $lookup: {
-        from: "halls",
-        localField: "hallId",
-        foreignField: "_id",
-        as: "hall"
-      }
+      $lookup: { from: "halls", localField: "hallId", foreignField: "_id", as: "hall" }
     },
     { $unwind: "$hall" }
   ]).toArray();
 
-  if (!rows[0]) {
-    return res.status(404).json({ message: "Showtime not found" });
-  }
+  if (!rows[0]) return res.status(404).json({ message: "Showtime not found" });
 
   const bookings = await getDb().collection("bookings").find({
-    showtimeId: id(req.params.id),
-    status: "CONFIRMED"
+    showtimeId, status: "CONFIRMED"
   }).toArray();
 
-  const bookedSeats = bookings.flatMap(b => b.seats);
-
-  res.json({ ...rows[0], bookedSeats });
+  res.json({
+    ...rows[0],
+    movie: decorateMovie(rows[0].movie),
+    hall: decorateHall(rows[0].hall),
+    bookedSeats: [...new Set(bookings.flatMap(b => b.seats || []))]
+  });
 });
 
 app.post("/api/showtimes", requireAuth, requireAdmin, async (req, res) => {
   const { movieId, hallId, date, startTime, price } = req.body;
-
   if (!movieId || !hallId || !date || !startTime) {
-    return res.status(400).json({
-      message: "Movie, hall, date and time are required"
+    return res.status(400).json({ message: "Movie, hall, date and time are required" });
+  }
+  if (!isObjectId(movieId)) return badId(res, "movie");
+  if (!isObjectId(hallId)) return badId(res, "hall");
+
+  const inputProblem = validateShowtimeInput({ date, startTime, price: price ?? 18 });
+  if (inputProblem) return res.status(400).json({ message: inputProblem });
+
+  const db = getDb();
+  const movie = await db.collection("movies").findOne({ _id: id(movieId) });
+  if (!movie) return res.status(404).json({ message: "Movie not found" });
+
+  const hall = await db.collection("halls").findOne({ _id: id(hallId) });
+  if (!hall) return res.status(404).json({ message: "Hall not found" });
+  
+  //Hall Status Check
+  if (hallStatus(hall) !== HALL_STATUS.ACTIVE) {
+    const status = hallStatus(hall);
+
+    return res.status(409).json({
+      message:
+        status === HALL_STATUS.MAINTENANCE
+          ? `"${hall.name}" is under maintenance and can't receive showtimes.`
+          : `"${hall.name}" is inactive and can't receive showtimes.`,
+      code: status === HALL_STATUS.MAINTENANCE
+        ? "HALL_MAINTENANCE"
+        : "HALL_INACTIVE"
+    });
+  }
+
+  const dateProblem = showtimeDateProblem(movie, date);
+  if (dateProblem) return res.status(400).json({ message: dateProblem });
+
+  const candidate = {
+    movieId: id(movieId),
+    hallId: id(hallId),
+    date,
+    startTime,
+    duration: Number(movie.duration),
+    title: movie.title
+  };
+
+  if (isShowtimePast(date, startTime)) {
+    return res.status(400).json({ message: "Showtime must start in the future." });
+  }
+
+  const conflict = await findShowtimeHallConflict(candidate);
+  if (conflict) {
+    return res.status(409).json({
+      message: conflictMessage(hall, conflict, 20),
+      code: "SHOWTIME_CONFLICT"
     });
   }
 
@@ -374,52 +767,99 @@ app.post("/api/showtimes", requireAuth, requireAdmin, async (req, res) => {
     hallId: id(hallId),
     date,
     startTime,
-    price: Number(price || 18),
+    price: Number(price ?? 18),
     status: "ACTIVE",
     createdAt: new Date()
   };
 
-  const result = await getDb().collection("showtimes").insertOne(showtime);
+  const result = await db.collection("showtimes").insertOne(showtime);
   showtime._id = result.insertedId;
-
   res.status(201).json(showtime);
 });
 
 app.put("/api/showtimes/:id", requireAuth, requireAdmin, async (req, res) => {
-  const update = {};
+  if (!isObjectId(req.params.id)) return badId(res, "showtime");
 
-  for (const key of ["date", "startTime", "price", "status"]) {
-    if (req.body[key] !== undefined) {
-      update[key] = key === "price"
-        ? Number(req.body[key])
-        : req.body[key];
-    }
+  const db = getDb();
+  const showtimeId = id(req.params.id);
+  const current = await db.collection("showtimes").findOne({ _id: showtimeId });
+  if (!current) return res.status(404).json({ message: "Showtime not found" });
+
+  const movieId = req.body.movieId ? id(req.body.movieId) : current.movieId;
+  const hallId = req.body.hallId ? id(req.body.hallId) : current.hallId;
+  const date = req.body.date ?? current.date;
+  const startTime = req.body.startTime ?? current.startTime;
+  const price = req.body.price !== undefined ? req.body.price : current.price;
+
+  if (!isObjectId(movieId) || !isObjectId(hallId)) {
+    return res.status(400).json({ message: "Movie and hall ids must be valid." });
   }
 
-  if (req.body.movieId) update.movieId = id(req.body.movieId);
-  if (req.body.hallId) update.hallId = id(req.body.hallId);
+  const inputProblem = validateShowtimeInput({ date, startTime, price });
+  if (inputProblem) return res.status(400).json({ message: inputProblem });
+  if (isShowtimePast(date, startTime)) {
+    return res.status(400).json({ message: "Showtime must start in the future." });
+  }
 
-  const result = await getDb().collection("showtimes").findOneAndUpdate(
-    { _id: id(req.params.id) },
-    { $set: update },
-    { returnDocument: "after" }
+  const [movie, hall] = await Promise.all([
+    db.collection("movies").findOne({ _id: movieId }),
+    db.collection("halls").findOne({ _id: hallId })
+  ]);
+  if (!movie) return res.status(404).json({ message: "Movie not found" });
+  if (!hall) return res.status(404).json({ message: "Hall not found" });
+  if (hallStatus(hall) !== HALL_STATUS.ACTIVE) {
+    const status = hallStatus(hall);
+
+    return res.status(409).json({
+      message:
+        status === HALL_STATUS.MAINTENANCE
+          ? `"${hall.name}" is under maintenance and can't receive showtimes.`
+          : `"${hall.name}" is inactive and can't receive showtimes.`,
+      code: status === HALL_STATUS.MAINTENANCE
+        ? "HALL_MAINTENANCE"
+        : "HALL_INACTIVE"
+    });
+  }
+
+  const dateProblem = showtimeDateProblem(movie, date);
+  if (dateProblem) return res.status(400).json({ message: dateProblem });
+
+  const candidate = {
+    movieId, hallId, date, startTime, duration: Number(movie.duration), title: movie.title
+  };
+  const conflict = await findShowtimeHallConflict(candidate, showtimeId);
+  if (conflict) {
+    return res.status(409).json({ message: conflictMessage(hall, conflict, 20), code: "SHOWTIME_CONFLICT" });
+  }
+
+  const update = { movieId, hallId, date, startTime, price: Number(price) };
+  if (req.body.status !== undefined) update.status = String(req.body.status).toUpperCase();
+
+  const result = await db.collection("showtimes").findOneAndUpdate(
+    { _id: showtimeId }, { $set: update }, { returnDocument: "after" }
   );
-
-  if (!result) {
-    return res.status(404).json({ message: "Showtime not found" });
-  }
-
+  if (!result) return res.status(404).json({ message: "Showtime not found" });
   res.json(result);
 });
 
 app.delete("/api/showtimes/:id", requireAuth, requireAdmin, async (req, res) => {
-  const result = await getDb().collection("showtimes")
-    .deleteOne({ _id: id(req.params.id) });
+  if (!isObjectId(req.params.id)) return badId(res, "showtime");
 
-  if (!result.deletedCount) {
-    return res.status(404).json({ message: "Showtime not found" });
+  const db = getDb();
+  const showtimeId = id(req.params.id);
+  const showtime = await db.collection("showtimes").findOne({ _id: showtimeId });
+  if (!showtime) return res.status(404).json({ message: "Showtime not found" });
+
+  const bookingCount = await db.collection("bookings").countDocuments({ showtimeId });
+  if (bookingCount > 0) {
+    return res.status(409).json({
+      message: "This showtime has bookings and can't be deleted.",
+      code: "SHOWTIME_HAS_BOOKINGS",
+      bookingCount
+    });
   }
 
+  await db.collection("showtimes").deleteOne({ _id: showtimeId });
   res.json({ message: "Showtime deleted" });
 });
 
@@ -524,7 +964,11 @@ app.post("/api/bookings", requireAuth, async (req, res) => {
       });
     }
 
-    const uniqueSeats = [...new Set(seats)];
+    const normalizedSeats = seats.map(seat => String(seat).trim().toUpperCase());
+    if (normalizedSeats.some(seat => !seat)) {
+      return res.status(400).json({ message: "Seat numbers cannot be empty." });
+    }
+    const uniqueSeats = [...new Set(normalizedSeats)];
 
     const showtime = await getDb()
       .collection("showtimes")
@@ -532,6 +976,24 @@ app.post("/api/bookings", requireAuth, async (req, res) => {
 
     if (!showtime) {
       return res.status(404).json({ message: "Showtime not found" });
+    }
+
+    // Booking rules: only movies inside their availability period can be booked.
+    const movie = await getDb()
+      .collection("movies")
+      .findOne({ _id: showtime.movieId });
+
+    if (!movie) {
+      return res.status(404).json({ message: "Movie not found" });
+    }
+
+    const movieStatus = getMovieStatus(movie);
+
+    if (movieStatus !== MOVIE_STATUS.NOW_SHOWING) {
+      return res.status(409).json({
+        message: bookingBlockedMessage(movie, movieStatus),
+        code: `MOVIE_${movieStatus}`
+      });
     }
 
     const hall = await getDb()
@@ -542,15 +1004,37 @@ app.post("/api/bookings", requireAuth, async (req, res) => {
       return res.status(404).json({ message: "Hall not found" });
     }
 
-    const validSeats = new Set();
+    if (hallStatus(hall) !== HALL_STATUS.ACTIVE) {
+      const status = hallStatus(hall);
 
-    for (let r = 0; r < hall.rows; r++) {
-      const row = String.fromCharCode(65 + r);
-
-      for (let s = 1; s <= hall.seatsPerRow; s++) {
-        validSeats.add(`${row}${String(s).padStart(2, "0")}`);
-      }
+      return res.status(409).json({
+        message:
+          status === HALL_STATUS.MAINTENANCE
+            ? `"${hall.name}" is under maintenance and this showtime can't be booked.`
+            : `"${hall.name}" is inactive and this showtime can't be booked.`,
+        code: status === HALL_STATUS.MAINTENANCE
+          ? "HALL_MAINTENANCE"
+          : "HALL_INACTIVE"
+      });
     }
+
+    if (isShowtimePast(showtime.date, showtime.startTime)) {
+      return res.status(409).json({
+        message: "This showtime has already started and can't be booked.",
+        code: "SHOWTIME_STARTED"
+      });
+    }
+
+    const availabilityProblem = showtimeDateProblem(movie, showtime.date);
+    if (availabilityProblem) {
+      return res.status(409).json({
+        message: availabilityProblem,
+        code: "SHOWTIME_OUTSIDE_MOVIE_AVAILABILITY"
+      });
+    }
+
+    const validSeats = generateValidSeats(hall.rows, hall.seatsPerRow);
+
 
     if (uniqueSeats.some(seat => !validSeats.has(seat))) {
       return res.status(400).json({
@@ -673,6 +1157,40 @@ app.put("/api/bookings/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ message: "Showtime not found." });
     }
 
+    const movie = await getDb().collection("movies").findOne({
+      _id: showtime.movieId
+    });
+
+    if (!movie) {
+      return res.status(404).json({ message: "Movie not found." });
+    }
+
+    {
+      const movieStatus = getMovieStatus(movie);
+
+      if (movieStatus !== MOVIE_STATUS.NOW_SHOWING) {
+        return res.status(409).json({
+          message: bookingBlockedMessage(movie, movieStatus),
+          code: `MOVIE_${movieStatus}`
+        });
+      }
+
+      const availabilityProblem = showtimeDateProblem(movie, showtime.date);
+      if (availabilityProblem) {
+        return res.status(409).json({
+          message: availabilityProblem,
+          code: "SHOWTIME_OUTSIDE_MOVIE_AVAILABILITY"
+        });
+      }
+    }
+
+    if (isShowtimePast(showtime.date, showtime.startTime)) {
+      return res.status(409).json({
+        message: "This showtime has already started and can't be changed for booking.",
+        code: "SHOWTIME_STARTED"
+      });
+    }
+
     const hall = await getDb().collection("halls").findOne({
       _id: showtime.hallId
     });
@@ -681,15 +1199,22 @@ app.put("/api/bookings/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ message: "Hall not found." });
     }
 
-    const validSeats = new Set();
+    if (hallStatus(hall) !== HALL_STATUS.ACTIVE) {
+      const status = hallStatus(hall);
 
-    for (let r = 0; r < hall.rows; r++) {
-      const row = String.fromCharCode(65 + r);
-
-      for (let s = 1; s <= hall.seatsPerRow; s++) {
-        validSeats.add(`${row}${String(s).padStart(2, "0")}`);
-      }
+      return res.status(409).json({
+        message:
+          status === HALL_STATUS.MAINTENANCE
+            ? `"${hall.name}" is under maintenance and this booking can't be changed.`
+            : `"${hall.name}" is inactive and this booking can't be changed.`,
+        code: status === HALL_STATUS.MAINTENANCE
+          ? "HALL_MAINTENANCE"
+          : "HALL_INACTIVE"
+      });
     }
+
+    const validSeats = generateValidSeats(hall.rows, hall.seatsPerRow);
+
 
     if (uniqueSeats.some(seat => !validSeats.has(seat))) {
       return res.status(400).json({
@@ -739,10 +1264,23 @@ app.put("/api/bookings/:id", requireAuth, async (req, res) => {
       });
     }
 
+    // Notify other clients viewing the same showtime that the seats have changed.
+    // This occurs when a customer releases a seat while editing a booking
+    const oldSeats=booking.seats || [];
+
+    const releasedSeats=oldSeats.filter(
+      (seat)=> !uniqueSeats.includes(seat)
+    );
+
+    const bookedSeats =uniqueSeats.filter(
+      (seat)=> !oldSeats.includes(seat)
+    );
+    
     broadcastToShowtime(String(booking.showtimeId), {
       type: "SEATS_UPDATED",
       showtimeId: String(booking.showtimeId),
-      seats: [...new Set([...(booking.seats || []), ...uniqueSeats])]
+      releasedSeats,
+      bookedSeats
     });
 
     const updatedBooking = await bookings.findOne({

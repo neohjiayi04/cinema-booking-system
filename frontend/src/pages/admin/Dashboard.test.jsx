@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import AdminDashboard from "./Dashboard.jsx";
 import { api } from "../../services/api.js";
@@ -55,10 +55,11 @@ const users = [
   { _id: "user002", name: "Bob" },
 ];
 
+// The dashboard reads the show day from showDateTime / dateTime / date
 const showtimes = [
-  { _id: "show001", startTime: todayDate },
-  { _id: "show002", startTime: todayDate },
-  { _id: "show003", startTime: yesterdayDate },
+  { _id: "show001", date: todayDate, startTime: "18:00" },
+  { _id: "show002", date: todayDate, startTime: "20:00" },
+  { _id: "show003", date: yesterdayDate, startTime: "18:00" },
 ];
 
 function mockDashboardData({
@@ -93,6 +94,18 @@ function getStatValue(label) {
   return statLabel
     .closest(".admin-stat-card")
     .querySelector(".admin-stat-value");
+}
+
+// Movie titles, amounts and status words also appear in the stat cards and
+// the Movie Performance table, so booking assertions are scoped to the
+// Recent Bookings section once its table has rendered.
+async function getRecentBookings() {
+  const heading = screen.getByRole("heading", { name: "Recent Bookings" });
+  const section = within(heading.closest("section"));
+
+  await section.findByRole("table");
+
+  return section;
 }
 
 describe("Admin Dashboard", () => {
@@ -151,7 +164,9 @@ describe("Admin Dashboard", () => {
 
     renderDashboard();
 
-    expect(screen.getAllByText("…")).toHaveLength(4);
+    // One placeholder for each of the five stat cards
+    expect(screen.getAllByText("…")).toHaveLength(5);
+    expect(screen.getByText("Loading movie performance…")).toBeInTheDocument();
     expect(screen.getByText("Loading bookings…")).toBeInTheDocument();
   });
 
@@ -160,42 +175,45 @@ describe("Admin Dashboard", () => {
 
     await screen.findByText("Alice");
 
-    expect(
-      screen.getByText("Movies in catalogue")
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByText("All recorded bookings")
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByText("Customer and admin accounts")
-    ).toBeInTheDocument();
+    expect(screen.getByText("Movies in catalogue")).toBeInTheDocument();
+    expect(screen.getByText("All recorded bookings")).toBeInTheDocument();
+    expect(screen.getByText("Customer and admin accounts")).toBeInTheDocument();
 
     expect(getStatValue("Total Movies")).toHaveTextContent("3");
     expect(getStatValue("Total Bookings")).toHaveTextContent("2");
     expect(getStatValue("Registered Users")).toHaveTextContent("2");
-    });
+  });
+
+  it("should display the confirmed booking revenue", async () => {
+    renderDashboard();
+
+    await screen.findByText("Alice");
+
+    // Only the confirmed RM 25 booking counts; the pending RM 30 one does not
+    expect(getStatValue("Booking Revenue")).toHaveTextContent("RM 25.00");
+  });
 
   it("should display the correct number of shows scheduled today", async () => {
     renderDashboard();
 
     await screen.findByText("Alice");
 
-   expect(getStatValue("Shows Today")).toHaveTextContent("2");
+    expect(getStatValue("Shows Today")).toHaveTextContent("2");
   });
 
   it("should display recent booking information", async () => {
     renderDashboard();
 
-    expect(await screen.findByText("Alice")).toBeInTheDocument();
-    expect(screen.getByText("Bob")).toBeInTheDocument();
+    const recent = await getRecentBookings();
 
-    expect(screen.getByText("Movie One")).toBeInTheDocument();
-    expect(screen.getByText("Movie Two")).toBeInTheDocument();
+    expect(recent.getByText("Alice")).toBeInTheDocument();
+    expect(recent.getByText("Bob")).toBeInTheDocument();
 
-    expect(screen.getByText("RM 25.00")).toBeInTheDocument();
-    expect(screen.getByText("RM 30.00")).toBeInTheDocument();
+    expect(recent.getByText("Movie One")).toBeInTheDocument();
+    expect(recent.getByText("Movie Two")).toBeInTheDocument();
+
+    expect(recent.getByText("RM 25.00")).toBeInTheDocument();
+    expect(recent.getByText("RM 30.00")).toBeInTheDocument();
   });
 
   it("should display the shortened booking reference", async () => {
@@ -210,10 +228,11 @@ describe("Admin Dashboard", () => {
   it("should display bookings in descending date order", async () => {
     renderDashboard();
 
-    await screen.findByText("Alice");
+    const recent = await getRecentBookings();
 
-    const rows = screen.getAllByRole("row");
+    const rows = recent.getAllByRole("row");
 
+    // rows[0] is the header row
     expect(rows[1]).toHaveTextContent("Alice");
     expect(rows[2]).toHaveTextContent("Bob");
   });
@@ -258,12 +277,11 @@ describe("Admin Dashboard", () => {
 
     renderDashboard();
 
-    const customerValues = await screen.findAllByText("Customer");
+    const recent = await getRecentBookings();
 
-    expect(customerValues).toHaveLength(2);
-    expect(customerValues[1]).toBeInTheDocument();
-
-    expect(screen.getByText("Movie booking")).toBeInTheDocument();
+    // One is the column header, the other is the fallback name in the row
+    expect(recent.getAllByText("Customer")).toHaveLength(2);
+    expect(recent.getByText("Movie booking")).toBeInTheDocument();
   });
 
   it("should display a partial-load error when one API request fails", async () => {
@@ -283,9 +301,7 @@ describe("Admin Dashboard", () => {
 
     renderDashboard();
 
-    expect(
-      await screen.findByRole("alert")
-    ).toHaveTextContent(
+    expect(await screen.findByRole("alert")).toHaveTextContent(
       "Some dashboard information could not be loaded."
     );
 
@@ -376,9 +392,7 @@ describe("Admin Dashboard", () => {
 
     renderDashboard();
 
-    expect(
-      await screen.findByText("No bookings yet")
-    ).toBeInTheDocument();
+    expect(await screen.findByText("No bookings yet")).toBeInTheDocument();
 
     expect(
       screen.getByText(/New customer bookings will appear here/)
@@ -388,7 +402,9 @@ describe("Admin Dashboard", () => {
   it("should apply the success status style to confirmed bookings", async () => {
     renderDashboard();
 
-    const status = await screen.findByText("Confirmed");
+    const recent = await getRecentBookings();
+
+    const status = recent.getByText("Confirmed");
 
     expect(status).toHaveClass("admin-status");
     expect(status).toHaveClass("admin-status-success");
@@ -397,7 +413,9 @@ describe("Admin Dashboard", () => {
   it("should apply the warning status style to pending bookings", async () => {
     renderDashboard();
 
-    const status = await screen.findByText("Pending");
+    const recent = await getRecentBookings();
+
+    const status = recent.getByText("Pending");
 
     expect(status).toHaveClass("admin-status");
     expect(status).toHaveClass("admin-status-warning");
@@ -419,7 +437,11 @@ describe("Admin Dashboard", () => {
 
     renderDashboard();
 
-    const status = await screen.findByText("Cancelled");
+    const recent = await getRecentBookings();
+
+    // "Cancelled" is also a column header in the performance table,
+    // so this query is scoped to the Recent Bookings section.
+    const status = recent.getByText("Cancelled");
 
     expect(status).toHaveClass("admin-status");
     expect(status).toHaveClass("admin-status-danger");

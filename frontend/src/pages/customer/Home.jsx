@@ -1,7 +1,14 @@
 import { useEffect, useState, useMemo } from "react";
-import { api } from "../services/api.js";
-import MovieCard from "../components/MovieCard.jsx";
-import "../styles/Home.css";
+import { api } from "../../services/api.js";
+import MovieCard from "../../components/MovieCard.jsx";
+import { MOVIE_STATUS, statusOf } from "../../constants/movieOptions.js";
+import "../../styles/Home.css";
+
+const TABS = [
+  { key: MOVIE_STATUS.NOW_SHOWING, label: "Now Showing", empty: "No movies are showing right now." },
+  { key: MOVIE_STATUS.COMING_SOON, label: "Coming Soon", empty: "No upcoming movies announced yet." },
+  { key: MOVIE_STATUS.ENDED, label: "Previously Shown", empty: "No previously shown movies." }
+];
 
 export default function Home() {
   const [movies, setMovies] = useState([]);
@@ -9,6 +16,7 @@ export default function Home() {
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedGenre, setSelectedGenre] = useState("All");
+  const [activeTab, setActiveTab] = useState(MOVIE_STATUS.NOW_SHOWING);
 
   const fetchMovies = () => {
     setLoading(true);
@@ -44,10 +52,24 @@ export default function Home() {
     };
   }, []);
 
-  // Dynamically extract unique genres from movies
+  // Movies in the active tab (Now Showing / Coming Soon / Previously Shown)
+  const tabMovies = useMemo(
+    () => movies.filter((m) => statusOf(m) === activeTab),
+    [movies, activeTab]
+  );
+
+  const tabCounts = useMemo(() => {
+    const counts = {};
+    TABS.forEach((tab) => {
+      counts[tab.key] = movies.filter((m) => statusOf(m) === tab.key).length;
+    });
+    return counts;
+  }, [movies]);
+
+  // Dynamically extract unique genres from the movies in this tab
   const genres = useMemo(() => {
     const set = new Set(["All"]);
-    movies.forEach((m) => {
+    tabMovies.forEach((m) => {
       if (Array.isArray(m.genre)) {
         m.genre.forEach((g) => set.add(g));
       } else if (m.genre) {
@@ -55,11 +77,14 @@ export default function Home() {
       }
     });
     return Array.from(set);
-  }, [movies]);
+  }, [tabMovies]);
+
+  // A genre chip from another tab may not exist here, so fall back to "All"
+  const activeGenre = genres.includes(selectedGenre) ? selectedGenre : "All";
 
   // Filter movies based on search text & active genre filter
   const filteredMovies = useMemo(() => {
-    return movies.filter((movie) => {
+    return tabMovies.filter((movie) => {
       const title = movie.title || "";
       const genreStr = Array.isArray(movie.genre) ? movie.genre.join(" ") : movie.genre || "";
       const matchesSearch =
@@ -67,17 +92,20 @@ export default function Home() {
         genreStr.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesGenre =
-        selectedGenre === "All" ||
+        activeGenre === "All" ||
         (Array.isArray(movie.genre)
-          ? movie.genre.includes(selectedGenre)
-          : genreStr.includes(selectedGenre));
+          ? movie.genre.includes(activeGenre)
+          : genreStr.includes(activeGenre));
 
       return matchesSearch && matchesGenre;
     });
-  }, [movies, searchTerm, selectedGenre]);
+  }, [tabMovies, searchTerm, activeGenre]);
 
-  // Featured movie (take first movie or fallback)
-  const featuredMovie = movies[0] || null;
+  // Featured movie: the first movie that is now showing (or any movie as a fallback)
+  const featuredMovie =
+    movies.find((m) => statusOf(m) === MOVIE_STATUS.NOW_SHOWING) || movies[0] || null;
+
+  const currentTab = TABS.find((tab) => tab.key === activeTab);
 
   return (
     <>
@@ -144,6 +172,30 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Availability tabs */}
+        <div className="status-tabs" role="tablist" aria-label="Movie availability">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              className={`status-tab ${activeTab === tab.key ? "active" : ""}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              {tab.label}
+              <span className="status-tab-count">{tabCounts[tab.key]}</span>
+            </button>
+          ))}
+        </div>
+
+        {activeTab === MOVIE_STATUS.COMING_SOON && (
+          <p className="status-tab-note">You can view upcoming movies now. Booking opens on each movie&apos;s start date.</p>
+        )}
+        {activeTab === MOVIE_STATUS.ENDED && (
+          <p className="status-tab-note">These movies have finished their run and can no longer be booked.</p>
+        )}
+
         {/* Search & Genre Filters */}
         <div className="filter-container">
           <div className="search-box">
@@ -166,7 +218,7 @@ export default function Home() {
               <button
                 key={genre}
                 onClick={() => setSelectedGenre(genre)}
-                className={`genre-chip ${selectedGenre === genre ? "active" : ""}`}
+                className={`genre-chip ${activeGenre === genre ? "active" : ""}`}
               >
                 {genre}
               </button>
@@ -191,8 +243,15 @@ export default function Home() {
           </div>
         )}
 
+        {/* Empty Tab State */}
+        {!loading && !error && tabMovies.length === 0 && movies.length > 0 && (
+          <div className="state-container">
+            <p>{currentTab.empty}</p>
+          </div>
+        )}
+
         {/* Empty Filter State */}
-        {!loading && !error && filteredMovies.length === 0 && (
+        {!loading && !error && (tabMovies.length > 0 || movies.length === 0) && filteredMovies.length === 0 && (
           <div className="state-container">
             <p>No movies match your search or filter criteria.</p>
             <button

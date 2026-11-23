@@ -59,14 +59,23 @@ function renderMovies() {
 
 async function waitForMovies() {
   await screen.findByRole("heading", { name: "Movies" });
+
+  // The admin page loads its list from /admin/movies
   await waitFor(() => {
-    expect(mockApi).toHaveBeenCalledWith("/movies");
+    expect(mockApi).toHaveBeenCalledWith("/admin/movies");
   });
+
+  // Wait for the list to render so no state updates happen after the test ends
+  await screen.findByText("Interstellar");
 }
 
 function getMovieRow(title) {
   const titleElement = screen.getByText(title);
   return titleElement.closest(".table-row");
+}
+
+function getGenreFilter() {
+  return screen.getByLabelText("Filter by genre");
 }
 
 describe("Admin Movies Page", () => {
@@ -106,7 +115,7 @@ describe("Admin Movies Page", () => {
 
     await waitForMovies();
 
-    expect(mockApi).toHaveBeenCalledWith("/movies");
+    expect(mockApi).toHaveBeenCalledWith("/admin/movies");
   });
 
   it("should display the Add New Movie form by default", async () => {
@@ -211,7 +220,7 @@ describe("Admin Movies Page", () => {
 
     await screen.findByText("Interstellar");
 
-    const genreSelect = screen.getByRole("combobox");
+    const genreSelect = getGenreFilter();
 
     expect(within(genreSelect).getByRole("option", { name: "All Genres" })).toBeInTheDocument();
     expect(within(genreSelect).getByRole("option", { name: "Sci-Fi" })).toBeInTheDocument();
@@ -223,7 +232,7 @@ describe("Admin Movies Page", () => {
 
     await screen.findByText("Interstellar");
 
-    fireEvent.change(screen.getByRole("combobox"), {
+    fireEvent.change(getGenreFilter(), {
       target: { value: "Horror" }
     });
 
@@ -242,7 +251,7 @@ describe("Admin Movies Page", () => {
       { target: { value: "space" } }
     );
 
-    fireEvent.change(screen.getByRole("combobox"), {
+    fireEvent.change(getGenreFilter(), {
       target: { value: "Sci-Fi" }
     });
 
@@ -269,12 +278,25 @@ describe("Admin Movies Page", () => {
 
     await waitForMovies();
 
-    fireEvent.change(screen.getByPlaceholderText("Enter movie title"), {
+    fireEvent.change(screen.getByLabelText("Title"), {
       target: { value: "Avatar" }
     });
 
-    fireEvent.change(screen.getByPlaceholderText("e.g. Action, Drama"), {
+    // Genre and Rating are <select> elements now
+    fireEvent.change(screen.getByLabelText("Genre"), {
       target: { value: "Sci-Fi" }
+    });
+
+    fireEvent.change(screen.getByLabelText("Rating"), {
+      target: { value: "PG" }
+    });
+
+    fireEvent.change(screen.getByLabelText("Start Date (Release)"), {
+      target: { value: "2026-12-01" }
+    });
+
+    fireEvent.change(screen.getByLabelText("End Date"), {
+      target: { value: "2026-12-31" }
     });
 
     fireEvent.submit(screen.getByRole("button", { name: "Add Movie" }).closest("form"));
@@ -292,12 +314,15 @@ describe("Admin Movies Page", () => {
       ([url, options]) => url === "/movies" && options?.method === "POST"
     );
 
+    // Status is calculated automatically from the dates, so it is not sent
     expect(JSON.parse(createCall[1].body)).toMatchObject({
       title: "Avatar",
       genre: "Sci-Fi",
       duration: 120,
       rating: "PG",
-      status: "NOW_SHOWING"
+      releaseDate: "2026-12-01",
+      endDate: "2026-12-31",
+      featured: false
     });
   });
 
@@ -314,10 +339,11 @@ describe("Admin Movies Page", () => {
       screen.getByRole("heading", { name: "Edit Movie Details" })
     ).toBeInTheDocument();
 
-    expect(screen.getByPlaceholderText("Enter movie title")).toHaveValue("Interstellar");
-    expect(screen.getByPlaceholderText("e.g. Action, Drama")).toHaveValue("Sci-Fi");
-    expect(screen.getByPlaceholderText("120")).toHaveValue(169);
-    expect(screen.getByPlaceholderText("PG, R, 18+")).toHaveValue("PG-13");
+    expect(screen.getByLabelText("Title")).toHaveValue("Interstellar");
+    expect(screen.getByLabelText("Genre")).toHaveValue("Sci-Fi");
+    expect(screen.getByLabelText("Duration (minutes)")).toHaveValue(169);
+    expect(screen.getByLabelText("Rating")).toHaveValue("PG-13");
+    expect(screen.getByLabelText("Start Date (Release)")).toHaveValue("2026-11-20");
     expect(screen.getByRole("button", { name: "Update Movie" })).toBeInTheDocument();
   });
 

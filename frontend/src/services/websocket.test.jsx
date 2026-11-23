@@ -49,7 +49,7 @@ describe("connectShowtime", () => {
     const socket = connectShowtime("showtime123", onMessage);
 
     expect(socket).toBeInstanceOf(MockWebSocket);
-    expect(socket.url).toBe("ws://localhost:3000");
+    expect(socket.url).toBe("ws://localhost:3001");
   });
 
   it("returns the created WebSocket instance", () => {

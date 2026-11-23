@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../services/api.js";
+import { MOVIE_STATUS } from "../../constants/movieOptions.js";
 
 const initialForm = {
   movieId: "",
@@ -9,264 +10,775 @@ const initialForm = {
   price: 18,
 };
 
-// Fetches everything the page needs. Lives outside the component so the
-// mount effect can call it without adding dependencies.
-const fetchAll = () =>
-  Promise.all([api("/movies"), api("/halls"), api("/showtimes")]);
+const HALL_STATUS = {
+  ACTIVE: "ACTIVE",
+  MAINTENANCE: "MAINTENANCE",
+  INACTIVE: "INACTIVE",
+};
+
+function formatDuration(minutes) {
+  const value = Number(minutes);
+
+  if (!Number.isFinite(value) || value < 0) {
+    return "—";
+  }
+
+  const hours = Math.floor(value / 60);
+  const remainingMinutes = value % 60;
+
+  if (hours === 0) {
+    return `${remainingMinutes} min`;
+  }
+
+  if (remainingMinutes === 0) {
+    return `${hours} hr`;
+  }
+
+  return `${hours} hr ${remainingMinutes} min`;
+}
+
+function timeToMinutes(time) {
+  if (!time || !/^\d{2}:\d{2}$/.test(time)) {
+    return null;
+  }
+
+  const [hours, minutes] = time.split(":").map(Number);
+
+  if (
+    !Number.isInteger(hours) ||
+    !Number.isInteger(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return null;
+  }
+
+  return hours * 60 + minutes;
+}
+
+function minutesToTime(totalMinutes) {
+  if (!Number.isFinite(totalMinutes)) {
+    return "";
+  }
+
+  const normalized = ((Math.floor(totalMinutes) % 1440) + 1440) % 1440;
+
+  const hours = Math.floor(normalized / 60);
+  const minutes = normalized % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+    2,
+    "0"
+  )}`;
+}
+
+function formatTime(time) {
+  if (!time || !/^\d{2}:\d{2}$/.test(time)) {
+    return "—";
+  }
+
+  const [hours, minutes] = time.split(":").map(Number);
+
+  if (
+    !Number.isInteger(hours) ||
+    !Number.isInteger(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return "—";
+  }
+
+  const date = new Date();
+
+  date.setHours(hours, minutes, 0, 0);
+
+  return date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function hallStatusLabel(status) {
+  switch (status) {
+    case HALL_STATUS.MAINTENANCE:
+      return "Maintenance";
+
+    case HALL_STATUS.INACTIVE:
+      return "Inactive";
+
+    default:
+      return "Active";
+  }
+}
 
 export default function Showtimes() {
   const [movies, setMovies] = useState([]);
   const [halls, setHalls] = useState([]);
   const [showtimes, setShowtimes] = useState([]);
+
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState(null);
-  const [saving, setSaving] = useState(false);
+
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const isEditing = Boolean(editingId);
+  const isEditing = editingId !== null;
 
-  // Used to refresh the data after save / delete
-  async function load() {
-    const [m, h, s] = await fetchAll();
+  function defaultMovieId(movieList) {
+    const availableMovies = movieList.filter(
+      (movie) =>
+        movie.status !== MOVIE_STATUS.ENDED &&
+        movie.status !== MOVIE_STATUS.ARCHIVED
+    );
 
-    setMovies(m);
-    setHalls(h);
-    setShowtimes(s);
+    return availableMovies[0]?._id || movieList[0]?._id || "";
+  }
 
-    setForm((f) => ({
-      ...f,
-      movieId: f.movieId || m[0]?._id || "",
-      hallId: f.hallId || h[0]?._id || "",
+  function defaultHallId(hallList) {
+    const activeHall = hallList.find(
+      (hall) =>
+        String(hall.status || HALL_STATUS.ACTIVE).toUpperCase() ===
+        HALL_STATUS.ACTIVE
+    );
+
+    return activeHall?._id || hallList[0]?._id || "";
+  }
+
+  async function fetchAll() {
+    const [movieData, hallData, showtimeData] = await Promise.all([
+      api("/movies"),
+      api("/halls"),
+      api("/showtimes"),
+    ]);
+
+    setMovies(movieData);
+    setHalls(hallData);
+    setShowtimes(showtimeData);
+
+    setForm((current) => ({
+      ...current,
+      movieId: current.movieId || defaultMovieId(movieData),
+      hallId: current.hallId || defaultHallId(hallData),
     }));
   }
 
-  // Initial load: setState only runs inside the .then callback
   useEffect(() => {
     let cancelled = false;
-    fetchAll()
-      .then(([m, h, s]) => {
-        if (cancelled) return;
-        setMovies(m);
-        setHalls(h);
-        setShowtimes(s);
-        setForm((f) => ({
-          ...f,
-          movieId: f.movieId || m[0]?._id || "",
-          hallId: f.hallId || h[0]?._id || "",
+
+    async function load() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [movieData, hallData, showtimeData] = await Promise.all([
+          api("/movies"),
+          api("/halls"),
+          api("/showtimes"),
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        setMovies(movieData);
+        setHalls(hallData);
+        setShowtimes(showtimeData);
+
+        setForm((current) => ({
+          ...current,
+          movieId: current.movieId || defaultMovieId(movieData),
+          hallId: current.hallId || defaultHallId(hallData),
         }));
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message || "Failed to load showtimes.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => { cancelled = true; };
+      } catch (err) {
+        if (!cancelled) {
+          setError(err.message || "Unable to load showtimes.");
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  function handleChange(e) {
-    const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
+  function setField(field) {
+    return (event) => {
+      setForm((current) => ({
+        ...current,
+        [field]: event.target.value,
+      }));
+
+      setMessage("");
+      setError("");
+    };
   }
 
-  function editShowtime(s) {
-    setEditingId(s._id);
-    setError("");
-
-    setForm({
-      movieId: s.movie?._id || s.movieId || "",
-      hallId: s.hall?._id || s.hallId || "",
-      date: String(s.date || "").slice(0, 10),
-      startTime: s.startTime || "",
-      price: s.price ?? 18,
-    });
-
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  function cancelEdit() {
-    setEditingId(null);
-    setError("");
-
+  function resetForm() {
     setForm({
       ...initialForm,
-      movieId: movies[0]?._id || "",
-      hallId: halls[0]?._id || "",
+      movieId: defaultMovieId(movies),
+      hallId: defaultHallId(halls),
+    });
+
+    setEditingId(null);
+    setMessage("");
+    setError("");
+  }
+
+  function startEdit(showtime) {
+    setMessage("");
+    setError("");
+
+    setEditingId(showtime._id);
+
+    setForm({
+      movieId: showtime.movieId || showtime.movie?._id || "",
+      hallId: showtime.hallId || showtime.hall?._id || "",
+      date: String(showtime.date || "").slice(0, 10),
+      startTime: showtime.startTime,
+      price: showtime.price,
+    });
+
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
     });
   }
 
-  async function submit(e) {
-    e.preventDefault();
-    setSaving(true);
+  async function remove(showtime) {
+    const movieTitle =
+      showtime.movie?.title ||
+      showtime.movieTitle ||
+      "this showtime";
+
+    const confirmed = window.confirm(
+      `Delete the showtime for "${movieTitle}" on ${showtime.date} at ${formatTime(
+        showtime.startTime
+      )}?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setMessage("");
     setError("");
 
     try {
+      await api(`/showtimes/${showtime._id}`, {
+        method: "DELETE",
+      });
+
+      if (editingId === showtime._id) {
+        resetForm();
+      }
+
+      setMessage("Showtime has been deleted.");
+      await fetchAll();
+    } catch (err) {
+      setError(err.message || "Unable to delete the showtime.");
+    }
+  }
+
+  async function submit(event) {
+    event.preventDefault();
+
+    setMessage("");
+    setError("");
+
+    if (!form.movieId) {
+      setError("Please select a movie.");
+      return;
+    }
+
+    if (!form.hallId) {
+      setError("Please select a hall.");
+      return;
+    }
+
+    if (!form.date) {
+      setError("Please select a date.");
+      return;
+    }
+
+    if (!form.startTime) {
+      setError("Please select a start time.");
+      return;
+    }
+
+    const price = Number(form.price);
+
+    if (!Number.isFinite(price) || price < 0) {
+      setError("Ticket price must be a valid amount of RM 0 or more.");
+      return;
+    }
+
+    const selectedHall = halls.find(
+      (hall) => hall._id === form.hallId
+    );
+
+    const hallStatus = String(
+      selectedHall?.status || HALL_STATUS.ACTIVE
+    ).toUpperCase();
+
+    if (
+      !isEditing &&
+      hallStatus !== HALL_STATUS.ACTIVE
+    ) {
+      setError(
+        hallStatus === HALL_STATUS.MAINTENANCE
+          ? `"${selectedHall?.name || "This hall"}" is under maintenance and cannot receive new showtimes.`
+          : `"${selectedHall?.name || "This hall"}" is inactive and cannot receive new showtimes.`
+      );
+
+      return;
+    }
+
+    setSaving(true);
+
+    try {
       const payload = {
-        ...form,
-        price: Number(form.price),
+        movieId: form.movieId,
+        hallId: form.hallId,
+        date: form.date,
+        startTime: form.startTime,
+        price,
       };
 
-      if (editingId) {
+      if (isEditing) {
         await api(`/showtimes/${editingId}`, {
           method: "PUT",
           body: JSON.stringify(payload),
         });
+
+        setMessage("Showtime has been updated.");
       } else {
         await api("/showtimes", {
           method: "POST",
           body: JSON.stringify(payload),
         });
+
+        setMessage("Showtime has been added.");
       }
 
-      setEditingId(null);
-      setForm({
-        ...initialForm,
-        movieId: movies[0]?._id || "",
-        hallId: halls[0]?._id || "",
-      });
-
-      await load();
+      resetForm();
+      await fetchAll();
     } catch (err) {
-      setError(err.message || "Failed to save showtime.");
+      setError(err.message || "Unable to save the showtime.");
     } finally {
       setSaving(false);
     }
   }
 
-  async function remove(id) {
-    if (!confirm("Delete this showtime?")) return;
+  const selectedMovie = movies.find(
+    (movie) => movie._id === form.movieId
+  );
 
-    try {
-      setError("");
-      await api(`/showtimes/${id}`, { method: "DELETE" });
+  const selectedHall = halls.find(
+    (hall) => hall._id === form.hallId
+  );
 
-      if (editingId === id) {
-        cancelEdit();
-      }
+  const movieDuration = Number(selectedMovie?.duration);
 
-      await load();
-    } catch (err) {
-      setError(err.message || "Failed to delete showtime.");
-    }
-  }
+  const cleaningMinutes = Number(
+    selectedHall?.cleaningMinutes ?? 20
+  );
+
+  const startMinutes = timeToMinutes(form.startTime);
+
+  const calculatedEndTime =
+    startMinutes !== null &&
+    Number.isFinite(movieDuration) &&
+    movieDuration >= 0
+      ? minutesToTime(startMinutes + movieDuration)
+      : "";
+
+  const hallAvailableTime =
+    calculatedEndTime &&
+    Number.isFinite(cleaningMinutes) &&
+    cleaningMinutes >= 0
+      ? minutesToTime(
+          timeToMinutes(calculatedEndTime) + cleaningMinutes
+        )
+      : "";
+
+  const crossesMidnight =
+    startMinutes !== null &&
+    calculatedEndTime &&
+    timeToMinutes(calculatedEndTime) <= startMinutes;
+
+  const selectableMovies = movies.filter(
+    (movie) =>
+      movie._id === form.movieId ||
+      (movie.status !== MOVIE_STATUS.ENDED &&
+        movie.status !== MOVIE_STATUS.ARCHIVED)
+  );
+
+  const selectableHalls = halls.filter((hall) => {
+    const status = String(
+      hall.status || HALL_STATUS.ACTIVE
+    ).toUpperCase();
+
+    return (
+      hall._id === form.hallId ||
+      status === HALL_STATUS.ACTIVE
+    );
+  });
 
   return (
     <section>
       <div className="admin-page-header">
         <div>
           <h1>Showtimes</h1>
+
           <p className="admin-page-description">
-            Manage your cinema showtimes and schedules.
+            Schedule movies in your cinema halls and manage ticket prices.
           </p>
         </div>
       </div>
 
+      {message && (
+        <div
+          className="admin-alert admin-alert-success admin-hall-alert"
+          role="status"
+        >
+          {message}
+        </div>
+      )}
+
       {error && (
-        <div role="alert" className="admin-alert admin-alert-error">
+        <div
+          className="admin-alert admin-alert-error admin-hall-alert"
+          role="alert"
+        >
           {error}
         </div>
       )}
 
-      {/* Add / Edit form */}
       <div className="admin-panel">
         <div className="admin-panel-header">
           <div>
             <h2 className="admin-section-title">
-              {isEditing ? "Edit Showtime" : "Add New Showtime"}
-            </h2>
-            <p className="admin-panel-subtitle">
               {isEditing
-                ? "Update the showtime details, then save your changes."
-                : "Pick a movie, hall, date, time and ticket price."}
+                ? "Edit Showtime"
+                : "Add New Showtime"}
+            </h2>
+
+            <p className="admin-panel-subtitle">
+              Pick a movie, hall, date, start time and ticket
+              price. The end time is calculated automatically.
             </p>
           </div>
         </div>
 
         <div className="admin-panel-body">
           <form onSubmit={submit}>
-            <div className="admin-form-grid">
-              <div className="admin-field">
-                <label className="admin-label" htmlFor="showtime-movie">Movie</label>
-                <select
-                  id="showtime-movie"
-                  name="movieId"
-                  className="admin-select"
-                  value={form.movieId}
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="" disabled>Select movie</option>
-                  {movies.map((m) => (
-                    <option key={m._id} value={m._id}>
-                      {m.title}
+            {/* =====================================================
+                SCHEDULE DETAILS
+                ===================================================== */}
+            <div className="showtime-form-section">
+              <div className="showtime-section-heading">
+                <div>
+                  <h3>Schedule details</h3>
+
+                  <p>
+                    Select the movie, hall, date, start time
+                    and ticket price.
+                  </p>
+                </div>
+              </div>
+
+              <div className="showtime-main-grid">
+                {/* Movie */}
+                <div className="admin-field">
+                  <label className="admin-label" htmlFor="showtime-movie">
+                    Movie
+                  </label>
+
+                  <select
+                    id="showtime-movie"
+                    className="admin-input"
+                    value={form.movieId}
+                    onChange={setField("movieId")}
+                    required
+                  >
+                    <option value="" disabled>
+                      Select a movie
                     </option>
-                  ))}
-                </select>
-              </div>
 
-              <div className="admin-field">
-                <label className="admin-label" htmlFor="showtime-hall">Hall</label>
-                <select
-                  id="showtime-hall"
-                  name="hallId"
-                  className="admin-select"
-                  value={form.hallId}
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="" disabled>Select hall</option>
-                  {halls.map((h) => (
-                    <option key={h._id} value={h._id}>
-                      {h.name}
+                    {selectableMovies.map((movie) => (
+                      <option key={movie._id} value={movie._id}>
+                        {movie.title}
+                        {movie.status === MOVIE_STATUS.ENDED
+                          ? " — Ended"
+                          : movie.status === MOVIE_STATUS.ARCHIVED
+                            ? " — Archived"
+                            : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Hall */}
+                <div className="admin-field">
+                  <label className="admin-label" htmlFor="showtime-hall">
+                    Hall
+                  </label>
+
+                  <select
+                    id="showtime-hall"
+                    className="admin-input"
+                    value={form.hallId}
+                    onChange={setField("hallId")}
+                    required
+                  >
+                    <option value="" disabled>
+                      Select a hall
                     </option>
-                  ))}
-                </select>
-              </div>
 
-              <div className="admin-field">
-                <label className="admin-label" htmlFor="showtime-date">Date</label>
-                <input
-                  id="showtime-date"
-                  type="date"
-                  name="date"
-                  className="admin-input"
-                  value={form.date}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+                    {selectableHalls.map((hall) => {
+                      const status = String(
+                        hall.status || HALL_STATUS.ACTIVE
+                      ).toUpperCase();
 
-              <div className="admin-field">
-                <label className="admin-label" htmlFor="showtime-time">Start time</label>
-                <input
-                  id="showtime-time"
-                  type="time"
-                  name="startTime"
-                  className="admin-input"
-                  value={form.startTime}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+                      const unavailable =
+                        status !== HALL_STATUS.ACTIVE &&
+                        hall._id !== form.hallId;
 
-              <div className="admin-field">
-                <label className="admin-label" htmlFor="showtime-price">Price (RM)</label>
-                <input
-                  id="showtime-price"
-                  type="number"
-                  name="price"
-                  className="admin-input"
-                  min="0"
-                  step="0.01"
-                  value={form.price}
-                  onChange={handleChange}
-                  required
-                />
+                      return (
+                        <option
+                          key={hall._id}
+                          value={hall._id}
+                          disabled={unavailable}
+                        >
+                          {hall.name}
+                          {status !== HALL_STATUS.ACTIVE
+                            ? ` — ${hallStatusLabel(status)}`
+                            : ""}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* Date */}
+                <div className="admin-field">
+                  <label className="admin-label" htmlFor="showtime-date">
+                    Date
+                  </label>
+
+                  <input
+                    id="showtime-date"
+                    type="date"
+                    className="admin-input"
+                    value={form.date}
+                    min={selectedMovie?.releaseDate || undefined}
+                    max={selectedMovie?.endDate || undefined}
+                    onChange={setField("date")}
+                    required
+                  />
+                </div>
+
+                {/* Start time */}
+                <div className="admin-field">
+                  <label
+                    className="admin-label"
+                    htmlFor="showtime-start-time"
+                  >
+                    Start time
+                  </label>
+
+                  <input
+                    id="showtime-start-time"
+                    type="time"
+                    className="admin-input"
+                    value={form.startTime}
+                    onChange={setField("startTime")}
+                    required
+                  />
+                </div>
+
+                {/* Price */}
+                <div className="admin-field">
+                  <label
+                    className="admin-label"
+                    htmlFor="showtime-price"
+                  >
+                    Price (RM)
+                  </label>
+
+                  <input
+                    id="showtime-price"
+                    type="number"
+                    className="admin-input"
+                    min="0"
+                    step="0.01"
+                    value={form.price}
+                    onChange={setField("price")}
+                    required
+                  />
+                </div>
               </div>
             </div>
 
-            <div className="admin-form-actions">
+            {/* =====================================================
+                AUTOMATIC SCHEDULE
+                ===================================================== */}
+            <div className="showtime-auto-section">
+              <div className="showtime-section-heading">
+                <div>
+                  <h3>Automatic schedule</h3>
+                </div>
+
+                <span className="showtime-auto-indicator">
+                  AUTO-CALCULATED
+                </span>
+              </div>
+
+              <div className="showtime-auto-grid">
+                {/* Movie duration */}
+                <div className="showtime-auto-card">
+                  <div className="showtime-auto-card-top">
+                    <span className="showtime-auto-label">
+                      Duration
+                    </span>
+
+                    <span className="showtime-auto-badge">
+                      AUTO
+                    </span>
+                  </div>
+
+                  <div className="showtime-auto-value">
+                    {Number.isFinite(movieDuration) && movieDuration >= 0
+                      ? formatDuration(movieDuration)
+                      : "—"}
+                  </div>
+
+                  <div className="showtime-auto-description">
+                    From movie settings
+                  </div>
+                </div>
+
+                {/* End time */}
+                <div className="showtime-auto-card">
+                  <div className="showtime-auto-card-top">
+                    <span className="showtime-auto-label">
+                      End time
+                    </span>
+
+                    <span className="showtime-auto-badge">
+                      AUTO
+                    </span>
+                  </div>
+
+                  <div className="showtime-auto-value">
+                    {calculatedEndTime
+                      ? formatTime(calculatedEndTime)
+                      : "—"}
+                  </div>
+
+                  <div className="showtime-auto-description">
+                    Start Time + duration
+                  </div>
+
+                  {crossesMidnight && (
+                    <div className="showtime-auto-note">
+                      Ends next day
+                    </div>
+                  )}
+                </div>
+
+                {/* Hall cleaning */}
+                <div className="showtime-auto-card">
+                  <div className="showtime-auto-card-top">
+                    <span className="showtime-auto-label">
+                      Cleaning
+                    </span>
+
+                    <span className="showtime-auto-badge">
+                      AUTO
+                    </span>
+                  </div>
+
+                  <div className="showtime-auto-value">
+                    {selectedHall
+                      ? `${cleaningMinutes} min`
+                      : "—"}
+                  </div>
+
+                  <div className="showtime-auto-description">
+                    From hall settings
+                  </div>
+                </div>
+
+                {/* Hall available again */}
+                <div className="showtime-auto-card">
+                  <div className="showtime-auto-card-top">
+                    <span className="showtime-auto-label">
+                      Available again
+                    </span>
+
+                    <span className="showtime-auto-badge">
+                      AUTO
+                    </span>
+                  </div>
+
+                  <div className="showtime-auto-value">
+                    {hallAvailableTime
+                      ? formatTime(hallAvailableTime)
+                      : "—"}
+                  </div>
+
+                  <div className="showtime-auto-description">
+                    End Time + cleaning
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* =====================================================
+                SUMMARY
+                ===================================================== */}
+            {selectedMovie &&
+              selectedHall &&
+              form.startTime &&
+              calculatedEndTime &&
+              hallAvailableTime && (
+                <div className="showtime-summary">
+                  <span className="showtime-summary-label">
+                    Schedule summary
+                  </span>
+
+                  <span className="showtime-summary-text">
+                    {selectedMovie.title} runs for{" "}
+                    {formatDuration(movieDuration)}, from{" "}
+                    {formatTime(form.startTime)} to{" "}
+                    {formatTime(calculatedEndTime)}.{" "}
+                    {selectedHall.name} then requires{" "}
+                    {cleaningMinutes} minutes of cleaning
+                    and will be available again at{" "}
+                    {formatTime(hallAvailableTime)}.
+                  </span>
+                </div>
+              )}
+
+            {/* =====================================================
+                FORM ACTIONS
+                ===================================================== */}
+            <div className="admin-form-actions showtime-form-actions">
               <button
                 type="submit"
                 className="admin-btn admin-btn-primary"
@@ -283,7 +795,7 @@ export default function Showtimes() {
                 <button
                   type="button"
                   className="admin-btn admin-btn-secondary"
-                  onClick={cancelEdit}
+                  onClick={resetForm}
                   disabled={saving}
                 >
                   Cancel
@@ -294,15 +806,22 @@ export default function Showtimes() {
         </div>
       </div>
 
-      {/* Showtime list */}
+      {/* =========================================================
+          ALL SHOWTIMES
+          ========================================================= */}
       <div className="admin-panel">
         <div className="admin-panel-header">
           <div>
-            <h2 className="admin-section-title">All Showtimes</h2>
+            <h2 className="admin-section-title">
+              All Showtimes
+            </h2>
+
             <p className="admin-panel-subtitle">
-              {loading
-                ? "Loading..."
-                : `${showtimes.length} ${showtimes.length === 1 ? "showtime" : "showtimes"} scheduled`}
+              {showtimes.length}{" "}
+              {showtimes.length === 1
+                ? "showtime"
+                : "showtimes"}{" "}
+              configured
             </p>
           </div>
         </div>
@@ -313,61 +832,149 @@ export default function Showtimes() {
           </div>
         ) : showtimes.length === 0 ? (
           <div className="admin-empty-state">
-            <div className="admin-empty-icon" aria-hidden="true">◷</div>
+            <div
+              className="admin-empty-icon"
+              aria-hidden="true"
+            >
+              ▷
+            </div>
+
             <h3>No showtimes yet</h3>
-            <p>Create your first showtime using the form above.</p>
+
+            <p>
+              Add your first showtime using the form above.
+            </p>
           </div>
         ) : (
-          <div className="admin-table-wrapper">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Movie</th>
-                  <th>Date</th>
-                  <th>Time</th>
-                  <th>Hall</th>
-                  <th>Price</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {showtimes.map((s) => (
-                  <tr
-                    key={s._id}
-                    className={s._id === editingId ? "is-editing" : ""}
-                  >
-                    <td className="admin-cell-primary">
-                      {s.movie?.title || "Unknown movie"}
-                    </td>
-                    <td>{String(s.date).slice(0, 10)}</td>
-                    <td>{s.startTime}</td>
-                    <td>{s.hall?.name || "Unknown hall"}</td>
-                    <td>
-                      <strong>RM {Number(s.price).toFixed(2)}</strong>
-                    </td>
-                    <td>
-                      <div className="admin-table-actions">
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn-secondary admin-btn-sm"
-                          onClick={() => editShowtime(s)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn-danger admin-btn-sm"
-                          onClick={() => remove(s._id)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
+          <>
+            <div className="admin-table-wrapper">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Movie</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Hall</th>
+                    <th>Price</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+
+                <tbody>
+                  {showtimes.map((showtime) => {
+                    const movie =
+                      showtime.movie ||
+                      movies.find(
+                        (item) =>
+                          item._id === showtime.movieId
+                      );
+
+                    const hall =
+                      showtime.hall ||
+                      halls.find(
+                        (item) =>
+                          item._id === showtime.hallId
+                      );
+
+                    const duration = Number(
+                      movie?.duration
+                    );
+
+                    const endTime =
+                      timeToMinutes(
+                        showtime.startTime
+                      ) !== null &&
+                      Number.isFinite(duration) &&
+                      duration >= 0
+                        ? minutesToTime(
+                            timeToMinutes(
+                              showtime.startTime
+                            ) + duration
+                          )
+                        : "";
+
+                    return (
+                      <tr
+                        key={showtime._id}
+                        className={
+                          showtime._id === editingId
+                            ? "is-editing"
+                            : ""
+                        }
+                      >
+                        <td className="admin-cell-primary">
+                          {movie?.title ||
+                            showtime.movieTitle ||
+                            "Unknown movie"}
+                        </td>
+
+                        <td>
+                          {String(showtime.date || "").slice(0, 10)}
+                        </td>
+
+                        <td>
+                          <div>
+                            {formatTime(
+                              showtime.startTime
+                            )}
+
+                            {endTime && (
+                              <div className="showtime-table-end">
+                                – {formatTime(endTime)}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+
+                        <td>
+                          {hall?.name ||
+                            showtime.hallName ||
+                            "Unknown hall"}
+                        </td>
+
+                        <td>
+                          RM{" "}
+                          {Number(
+                            showtime.price
+                          ).toFixed(2)}
+                        </td>
+
+                        <td>
+                          <div className="admin-table-actions">
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn-secondary admin-btn-sm"
+                              onClick={() =>
+                                startEdit(showtime)
+                              }
+                            >
+                              Edit
+                            </button>
+
+                            <button
+                              type="button"
+                              className="admin-btn admin-btn-danger admin-btn-sm"
+                              onClick={() =>
+                                remove(showtime)
+                              }
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="admin-table-footer">
+              <span>
+                Total showtimes: {showtimes.length}
+              </span>
+            </div>
+          </>
         )}
       </div>
     </section>
