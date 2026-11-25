@@ -252,6 +252,12 @@ export default function Showtimes() {
   }
 
   function startEdit(showtime) {
+    const bookingCount = Number(showtime.bookingCount);
+    if (Number.isFinite(bookingCount) && bookingCount > 0) {
+      setMessage("");
+      setError("This showtime has bookings and cannot be edited.");
+      return;
+    }
     setMessage("");
     setError("");
 
@@ -991,7 +997,9 @@ export default function Showtimes() {
                           <div className="app-act-group">
                             <ActionButton
                               variant="edit"
+                              icon={locked ? "lock" : "trash"}
                               onClick={() => startEdit(showtime)}
+                              disabled={locked}
                             >
                               Edit
                             </ActionButton>
