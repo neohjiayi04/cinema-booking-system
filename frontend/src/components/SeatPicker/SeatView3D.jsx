@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unknown-property -- react-three-fiber elements (mesh, args, position...) are not DOM props */
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
@@ -44,7 +45,7 @@ function makeScreenTexture() {
 function Hall({ seats, selectedIds }) {
   const baseRef = useRef();
   const backRef = useRef();
-  const screenTex = useMemo(makeScreenTexture, []);
+  const screenTex = useMemo(() => makeScreenTexture(), []);
 
   const depth = useMemo(() => Math.max(20, Math.max(...seats.map((s) => s.y)) + 3), [seats]);
   const rows = useMemo(() => {
@@ -177,4 +178,4 @@ export default function SeatView3D({ seats, selectedIds, focusSeat }) {
       <span className="sp-drag">Drag to look around</span>
     </div>
   );
-}
+}

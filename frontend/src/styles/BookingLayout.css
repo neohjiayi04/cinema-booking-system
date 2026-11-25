@@ -1,0 +1,63 @@
+/* Booking page: compact header, sticky date/time chips, 2D seat map (62%) + 3D preview (38%), sticky checkout.
+   Imported after MovieDetails.css; adds new .cb-* classes only. Change --cb-top if your top bar is taller than 4rem. */
+.combined-booking-page { --cb-top: 4rem; }
+
+/* ---------- Movie header ---------- */
+.cb-head { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 1.1rem; align-items: start; padding: 1rem 1.25rem; border: 1px solid #e2e8f0; border-radius: 20px; background: #fff; box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04); }
+.cb-head img { width: 64px; aspect-ratio: 2 / 3; object-fit: cover; border-radius: 10px; background: #f1f5f9; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25); }
+.cb-head-top { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.9rem; }
+.cb-head h1 { margin: 0; color: #0f172a; font-family: Georgia, serif; font-size: clamp(1.4rem, 2.4vw, 1.9rem); line-height: 1.15; }
+.cb-head .combined-eyebrow { margin: 0; }
+.cb-head .combined-meta { margin: 0.5rem 0 0; gap: 0.35rem; }
+.cb-head .combined-meta span { padding: 0.15rem 0.55rem; font-size: 0.72rem; }
+.cb-desc { margin: 0.6rem 0 0; max-width: 90ch; color: #64748b; font-size: 0.9rem; line-height: 1.6; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.cb-desc.is-open { display: block; -webkit-line-clamp: unset; line-clamp: unset; overflow: visible; }
+.cb-more { margin-top: 0.25rem; padding: 0; border: 0; background: none; color: #2563eb; font: inherit; font-size: 0.82rem; font-weight: 600; cursor: pointer; }
+.cb-more:hover { text-decoration: underline; }
+
+/* ---------- Date tabs + time chips (stays pinned while you scroll the seats) ---------- */
+.cb-when { position: sticky; top: var(--cb-top); z-index: 15; display: grid; gap: 0.55rem; margin: 1rem 0; padding: 0.7rem 0.9rem; border: 1px solid #dbeafe; border-radius: 16px; background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 8px 24px rgba(37, 99, 235, 0.08); }
+.cb-tabs, .cb-chips { display: flex; gap: 0.5rem; overflow-x: auto; scrollbar-width: thin; padding-bottom: 2px; }
+.cb-tab { flex: none; padding: 0.35rem 0.9rem; border: 1px solid #e2e8f0; border-radius: 9999px; background: #fff; color: #475569; font: inherit; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease; }
+.cb-tab:hover { border-color: #2563eb; color: #1d4ed8; }
+.cb-tab.is-on { border-color: #2563eb; background: #2563eb; color: #fff; }
+.cb-chip { flex: none; display: grid; gap: 0.1rem; min-width: 112px; padding: 0.45rem 0.85rem; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; color: #0f172a; font: inherit; text-align: left; cursor: pointer; transition: all 0.15s ease; }
+.cb-chip strong { font-size: 1.05rem; letter-spacing: -0.01em; }
+.cb-chip span { color: #64748b; font-size: 0.7rem; white-space: nowrap; }
+.cb-chip:hover { border-color: #2563eb; }
+.cb-chip.is-on { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 1px #2563eb inset; }
+.cb-chip.is-on span { color: #1d4ed8; }
+.cb-tab:focus-visible, .cb-chip:focus-visible, .cb-more:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.cb-when-empty { margin: 0; color: #64748b; font-size: 0.88rem; }
+
+/* ---------- Seating: map 62% + preview 38% ---------- */
+.cb-seating-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1rem; margin-bottom: 1rem; }
+.cb-seating-head h2 { margin: 0; color: #0f172a; font-family: Georgia, serif; font-size: clamp(1.3rem, 2vw, 1.6rem); }
+.cb-seating-tools { display: flex; align-items: center; gap: 1rem; }
+
+.cb-seatgrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+.cb-seatgrid.has-preview { grid-template-columns: minmax(0, 62fr) minmax(0, 38fr); }
+.cb-seatgrid .combined-seat-map { min-width: 0; }
+.cb-preview { position: sticky; top: calc(var(--cb-top) + 6.5rem); }
+.cb-preview .sp3d .sp-pov { height: clamp(230px, 36vh, 340px); }
+.cb-preview .sp3d-empty { min-height: clamp(230px, 36vh, 340px); }
+
+/* Checkout bar keeps working as before; just a little more breathing room under the map */
+.combined-booking-page .combined-checkout { margin-top: 1.25rem; }
+
+/* ---------- Popup (passed showtime etc.) ---------- */
+.cb-modal-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 1rem; background: rgba(15, 23, 42, 0.55); }
+.cb-modal { width: min(420px, 100%); padding: 1.5rem; border-radius: 20px; background: #fff; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35); }
+.cb-modal h2 { margin: 0 0 0.5rem; color: #0f172a; font-family: Georgia, serif; font-size: 1.35rem; }
+.cb-modal p { margin: 0 0 1.25rem; color: #475569; font-size: 0.92rem; line-height: 1.6; }
+.cb-modal .combined-confirm-button { width: 100%; }
+
+@media (max-width: 1100px) {
+  .cb-seatgrid.has-preview { grid-template-columns: minmax(0, 1fr); }
+  .cb-preview { position: static; }
+}
+@media (max-width: 720px) {
+  .cb-head { grid-template-columns: 52px minmax(0, 1fr); padding: 0.85rem; }
+  .cb-head img { width: 52px; }
+  .cb-seating-head { align-items: flex-start; flex-direction: column; }
+}

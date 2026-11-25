@@ -1,21 +1,96 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import SeatMap from "../../components/SeatMap.jsx";
-import ViewToggle from "../../components/SeatPicker/ViewToggle.jsx";
+import SeatPreview3D, { PreviewSwitch } from "../../components/SeatPicker/SeatPreview3D.jsx";
 import { api } from "../../services/api.js";
 import { connectShowtime } from "../../services/websocket.js";
 import { MOVIE_STATUS, MOVIE_STATUS_LABELS, statusOf, formatDate } from "../../constants/movieOptions.js";
+import { dateTabLabel, groupByDate, hasStarted, upcomingShowtimes } from "../../constants/showtimeTime.js";
 import "../../styles/MovieDetails.css";
-
-// lazy: the 3D code (three.js) only downloads when the customer switches to the 3D view
-const SeatPicker = lazy(() => import("../../components/SeatPicker/SeatPicker.jsx"));
+import "../../styles/BookingLayout.css";
 
 const PENDING_KEY = "cinemax.pendingBooking";
+const CLOCK_TICK_MS = 30000; // how often the page re-checks whether a showtime has started
 
 function readPendingBooking() {
   try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null"); }
   catch { return null; }
+}
+
+// Works out which seat a mouse/keyboard event is on, from the seat button's title or aria-label
+// (e.g. "Seat A01 - Available" or "Row A, seat 1"). Returns "A01", or null if it can't tell.
+function seatIdFromEvent(event) {
+  const element = event.target?.closest?.("[title], [aria-label]");
+  const text = element?.getAttribute("title") || element?.getAttribute("aria-label") || "";
+  const label = /\b([A-Z])\s?0?(\d{1,2})\b/.exec(text) || /Row\s+([A-Z]),?\s+seat\s+(\d{1,2})/i.exec(text);
+  return label ? `${label[1].toUpperCase()}${label[2].padStart(2, "0")}` : null;
+}
+
+// Date tabs + time chips. Only showtimes that haven't started are passed in.
+function ShowtimePicker({ groups, selectedId, activeDate, today, onSelect }) {
+  if (!groups.length) {
+    return <p className="cb-when-empty">There are no upcoming showtimes for this movie.</p>;
+  }
+  const activeItems = groups.find(([date]) => date === activeDate)?.[1] || [];
+  return (
+    <>
+      <div className="cb-tabs" aria-label="Choose a date">
+        {groups.map(([date, items]) => (
+          <button
+            type="button"
+            key={date}
+            className={`cb-tab ${date === activeDate ? "is-on" : ""}`}
+            aria-pressed={date === activeDate}
+            onClick={() => date !== activeDate && onSelect(items[0]._id)}
+          >
+            {dateTabLabel(date, today)}
+          </button>
+        ))}
+      </div>
+      <div className="cb-chips" aria-label="Choose a showtime">
+        {activeItems.map((showtime) => (
+          <button
+            type="button"
+            key={showtime._id}
+            className={`cb-chip ${selectedId === showtime._id ? "is-on" : ""}`}
+            aria-pressed={selectedId === showtime._id}
+            onClick={() => onSelect(showtime._id)}
+          >
+            <strong>{showtime.startTime}</strong>
+            <span>{showtime.hall?.name || "Cinema Hall"} · RM {Number(showtime.price || 0).toFixed(2)}</span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
+
+// Popup for "this showtime has passed" and similar booking rules.
+function NoticeDialog({ message, onClose }) {
+  const buttonRef = useRef(null);
+  useEffect(() => { buttonRef.current?.focus(); }, []);
+  useEffect(() => {
+    const onKey = (event) => { if (event.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="cb-modal-backdrop" onClick={onClose}>
+      <div
+        className="cb-modal"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="cb-modal-title"
+        aria-describedby="cb-modal-text"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 id="cb-modal-title">Showtime unavailable</h2>
+        <p id="cb-modal-text">{message}</p>
+        <button ref={buttonRef} type="button" className="combined-confirm-button" onClick={onClose}>Choose another showtime</button>
+      </div>
+    </div>
+  );
 }
 
 // Wrapper: key={id} remounts the page with fresh state whenever the movie changes,
@@ -42,9 +117,19 @@ function MovieDetails({ movieId }) {
   const [seatLoading, setSeatLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState(""); // popup text (passed showtime etc.)
   const [resumeReady, setResumeReady] = useState(false);
-  const [viewMode, setViewMode] = useState("2d"); // "2d" = your flat SeatMap (default), "3d" = SeatPicker with the 3D view
+  const [showPreview, setShowPreview] = useState(true); // 3D hall preview beside the map; the customer can switch it off
+  const [hoverId, setHoverId] = useState(null);
+  const [descOpen, setDescOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
   const resumedRef = useRef(false);
+
+  // Keep "now" fresh so showtimes disappear (and the popup appears) when their start time passes.
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), CLOCK_TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
 
   // Load movie + showtimes (runs once per mount; remounts when movieId changes)
   useEffect(() => {
@@ -57,9 +142,16 @@ function MovieDetails({ movieId }) {
         // Movies that aren't Now Showing (coming soon, ended, archived) can't be booked,
         // so don't preselect a showtime or open the live seat connection for them.
         const canBook = (movieData.bookable ?? statusOf(movieData) === MOVIE_STATUS.NOW_SHOWING);
+        // Showtimes that already started are never offered.
+        const upcoming = upcomingShowtimes(showtimeData || [], Date.now());
         const saved = readPendingBooking();
         const savedShowtime = saved?.movieId === movieId ? saved.showtimeId : "";
-        const initialId = canBook ? (savedShowtime || showtimeData?.[0]?._id || "") : "";
+        const savedStillOpen = Boolean(savedShowtime) && upcoming.some((showtime) => showtime._id === savedShowtime);
+        if (canBook && savedShowtime && !savedStillOpen) {
+          sessionStorage.removeItem(PENDING_KEY);
+          setNotice("The showtime you chose has already started or is no longer available. Please choose another showtime.");
+        }
+        const initialId = canBook ? (savedStillOpen ? savedShowtime : (upcoming[0]?._id || "")) : "";
         setSelectedShowtimeId(initialId);
         setSeatLoading(Boolean(initialId));
       })
@@ -110,10 +202,24 @@ function MovieDetails({ movieId }) {
     [selectedSeats, showtimeDetails]
   );
 
-  // The same seats in the shape the 3D SeatPicker expects (ids are your seat labels, e.g. "F06").
-  const pickerSeats = useMemo(() => {
+  // Showtimes that have not started yet, grouped by date. Started ones are hidden completely.
+  const upcoming = useMemo(() => upcomingShowtimes(showtimes, now), [showtimes, now]);
+  const showtimeGroups = useMemo(() => groupByDate(upcoming), [upcoming]);
+  const selectedShowtime = useMemo(
+    () => showtimes.find((showtime) => showtime._id === selectedShowtimeId) || null,
+    [showtimes, selectedShowtimeId]
+  );
+  // The chosen showtime started while the page was open.
+  const selectedStarted = selectedShowtime ? hasStarted(selectedShowtime, now) : false;
+  const activeDate = selectedShowtime && !selectedStarted ? selectedShowtime.date : showtimeGroups[0]?.[0];
+  const dialogMessage = notice || (selectedStarted
+    ? `The ${selectedShowtime.startTime} showtime on ${selectedShowtime.date} has already started. Please choose another showtime.`
+    : "");
+
+  // The hall's seats in the shape the 3D preview expects (ids are your seat labels, e.g. "F06").
+  const previewSeats = useMemo(() => {
     const hall = showtimeDetails?.hall;
-    if (!hall) return [];
+    if (!showPreview || !hall) return [];
     const result = [];
     for (let row = 0; row < Number(hall.rows); row++) {
       const rowLabel = String.fromCharCode(65 + row);
@@ -130,11 +236,16 @@ function MovieDetails({ movieId }) {
       }
     }
     return result;
-  }, [showtimeDetails, bookedSeats]);
+  }, [showPreview, showtimeDetails, bookedSeats]);
 
-  // Returns the error message when the booking fails (undefined on success, because we navigate away).
   const createBooking = useCallback(async (showtimeId, seats) => {
-    if (!showtimeId || !seats?.length || isSubmitting) return undefined;
+    if (!showtimeId || !seats?.length || isSubmitting) return;
+    // Rule: a showtime that has already started can't be booked.
+    const showtime = showtimes.find((item) => item._id === showtimeId);
+    if (showtime && hasStarted(showtime, Date.now())) {
+      setNotice(`The ${showtime.startTime} showtime on ${showtime.date} has already started. Please choose another showtime.`);
+      return;
+    }
     setError("");
     setIsSubmitting(true);
     try {
@@ -144,15 +255,15 @@ function MovieDetails({ movieId }) {
       });
       sessionStorage.removeItem(PENDING_KEY);
       navigate(`/booking-confirmation/${booking._id}`, { replace: true });
-      return undefined;
     } catch (e) {
       const message = e.message || "Booking failed. Please check seat availability and try again.";
       setError(message);
+      // If the server rejected it because the showtime has passed, say so in a popup as well.
+      if (/(already started|has started|has passed|already passed|in the past)/i.test(message)) setNotice(message);
       setIsSubmitting(false);
       resumedRef.current = true;
-      return message;
     }
-  }, [isSubmitting, navigate]);
+  }, [isSubmitting, navigate, showtimes]);
 
   // Auto-submit the pending booking after returning from the login page.
   useEffect(() => {
@@ -172,9 +283,16 @@ function MovieDetails({ movieId }) {
     setBookedSeats([]);
     setSelectedSeats([]);
     setResumeReady(false);
-    setSeatLoading(true);
+    setSeatLoading(Boolean(id));
     setError("");
+    setHoverId(null);
     resumedRef.current = false;
+  }
+
+  // Closes the popup; if the chosen showtime is the one that passed, move to the next upcoming one.
+  function closeDialog() {
+    setNotice("");
+    if (selectedStarted) selectShowtime(upcoming[0]?._id || "");
   }
 
   function toggleSeat(seat) {
@@ -183,41 +301,20 @@ function MovieDetails({ movieId }) {
       : [...previous, seat]);
   }
 
-  // The two views keep their own selections, so switching starts a fresh pick.
-  function changeView(mode) {
-    if (mode === viewMode) return;
-    setViewMode(mode);
-    setSelectedSeats([]);
-    setError("");
-  }
-
-  // Saves the seats and sends a logged-out customer to log in; returns true if it did.
-  function redirectToLogin(seats) {
-    if (user) return false;
-    sessionStorage.setItem(PENDING_KEY, JSON.stringify({
-      movieId,
-      showtimeId: selectedShowtimeId,
-      seats
-    }));
-    const returnTo = `/movies/${movieId}?resumeBooking=1`;
-    navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
-    return true;
-  }
-
   function confirmBooking() {
     if (!selectedShowtimeId || !selectedSeats.length || isSubmitting) return;
     setError("");
-    if (redirectToLogin(selectedSeats)) return;
+    if (!user) {
+      sessionStorage.setItem(PENDING_KEY, JSON.stringify({
+        movieId,
+        showtimeId: selectedShowtimeId,
+        seats: selectedSeats
+      }));
+      const returnTo = `/movies/${movieId}?resumeBooking=1`;
+      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+      return;
+    }
     createBooking(selectedShowtimeId, selectedSeats);
-  }
-
-  // 3D view: the SeatPicker's own Book button ends up here.
-  async function confirmPickedSeats(picked) {
-    if (!selectedShowtimeId || !picked.length || isSubmitting) return;
-    const seatIds = picked.map((seat) => seat.raw._id);
-    if (redirectToLogin(seatIds)) return;
-    const failure = await createBooking(selectedShowtimeId, seatIds);
-    if (failure) throw new Error(failure);
   }
 
   if (loading) return <div className="combined-state">Loading movie and showtimes…</div>;
@@ -225,138 +322,143 @@ function MovieDetails({ movieId }) {
 
   const status = statusOf(movie);
   const bookable = movie.bookable ?? status === MOVIE_STATUS.NOW_SHOWING;
-  const is3D = viewMode === "3d";
+  const genreText = Array.isArray(movie.genre) ? movie.genre.join(" · ") : movie.genre;
+  const description = movie.description || movie.synopsis || "Choose a screening and your seats to book this movie.";
+  const hallReady = Boolean(showtimeDetails?.hall) && Number(showtimeDetails.hall.rows) > 0 && Number(showtimeDetails.hall.seatsPerRow) > 0;
 
   return (
     <div className="combined-booking-page">
       <Link className="combined-back-link" to="/">← Back to all movies</Link>
 
-      <section className="combined-movie-hero">
-        <div className="combined-poster-wrap">
-          <img className="combined-poster" src={movie.poster || "https://placehold.co/400x600?text=Movie"} alt={`${movie.title} poster`} />
-        </div>
-        <div className="combined-movie-copy">
-          <span className="combined-eyebrow">{MOVIE_STATUS_LABELS[status].toUpperCase()}</span>
-          <h1>{movie.title}</h1>
-          <div className="combined-meta">
-            <span>{Array.isArray(movie.genre) ? movie.genre.join(" · ") : movie.genre}</span>
-            {movie.duration && <span>{movie.duration} min</span>}
-            {movie.rating && <span>{movie.rating}</span>}
-            {bookable && movie.endDate && <span>Showing until {formatDate(movie.endDate)}</span>}
-          </div>
-          <p>{movie.description || movie.synopsis || "Choose a screening and your seats to book this movie."}</p>
-        </div>
-      </section>
-
       {!bookable ? (
-        <section className={`combined-section combined-status-panel status-${status.toLowerCase().replace("_", "-")}`} role="status">
-          {status === MOVIE_STATUS.COMING_SOON && (
-            <>
-              <h2>Coming soon</h2>
-              <p>
-                You can read about this movie now, but booking isn&apos;t open yet.
-                {movie.releaseDate && <> Booking opens on <strong>{formatDate(movie.releaseDate)}</strong>.</>}
-              </p>
-            </>
-          )}
-          {status === MOVIE_STATUS.ENDED && (
-            <>
-              <h2>No longer showing</h2>
-              <p>
-                This movie has finished its run
-                {movie.endDate && <> (ended <strong>{formatDate(movie.endDate)}</strong>)</>} and can no longer be booked.
-              </p>
-            </>
-          )}
-          {status === MOVIE_STATUS.ARCHIVED && (
-            <>
-              <h2>Archived</h2>
-              <p>This movie is archived and is no longer available for booking.</p>
-            </>
-          )}
-          <Link className="combined-back-link" to="/">Browse movies now showing</Link>
-        </section>
-      ) : (
         <>
-      <section className="combined-section" id="showtimes-section">
-        <div className="combined-section-heading">
-          <div><span className="combined-eyebrow">01 / SCREENING</span><h2>Choose a showtime</h2></div>
-          <span className="combined-step-note">Select one screening</span>
-        </div>
-        {showtimes.length ? (
-          <div className="combined-showtime-grid">
-            {showtimes.map((showtime) => {
-              const active = selectedShowtimeId === showtime._id;
-              return (
-                <button
-                  type="button"
-                  key={showtime._id}
-                  className={`combined-showtime ${active ? "active" : ""}`}
-                  onClick={() => selectShowtime(showtime._id)}
-                >
-                  {/* Active Checkmark Badge */}
-                  {active && <span className="combined-showtime-check">✓</span>}
+          <section className="combined-movie-hero">
+            <div className="combined-poster-wrap">
+              <img className="combined-poster" src={movie.poster || "https://placehold.co/400x600?text=Movie"} alt={`${movie.title} poster`} />
+            </div>
+            <div className="combined-movie-copy">
+              <span className="combined-eyebrow">{MOVIE_STATUS_LABELS[status].toUpperCase()}</span>
+              <h1>{movie.title}</h1>
+              <div className="combined-meta">
+                <span>{genreText}</span>
+                {movie.duration && <span>{movie.duration} min</span>}
+                {movie.rating && <span>{movie.rating}</span>}
+              </div>
+              <p>{description}</p>
+            </div>
+          </section>
 
-                  {/* Date at the top */}
-                  <span className="combined-showtime-date">{showtime.date}</span>
-
-                  {/* Big bold time in the middle */}
-                  <strong>{showtime.startTime}</strong>
-
-                  {/* Hall info & Price pill container at the bottom */}
-                  <div className="combined-showtime-footer">
-                    <span className="combined-showtime-hall-badge">{showtime.hall?.name || "Cinema Hall"}</span>
-                    <span className="combined-showtime-price">RM {Number(showtime.price || 0).toFixed(2)}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        ) : <p className="combined-empty">There are no showtimes available for this movie yet.</p>}
-      </section>
-
-      <section className="combined-section combined-seats-section">
-        <div className="combined-section-heading">
-          <div><span className="combined-eyebrow">02 / SEATING</span><h2>Select your seats</h2></div>
-          {showtimeDetails && <span className={`combined-live-status ${connected ? "is-live" : ""}`}><i />{connected ? "Live seat updates" : "Connecting to live seating"}</span>}
-        </div>
-        {!selectedShowtimeId ? <p className="combined-empty">Choose a showtime above to see its seating plan.</p> : seatLoading || !showtimeDetails ? <p className="combined-empty">Loading the seating plan…</p> : (
-          <>
-            {!showtimeDetails.hall || !Number(showtimeDetails.hall.rows) || !Number(showtimeDetails.hall.seatsPerRow) ? (
-              <p className="combined-empty combined-error" role="alert">
-                Hall seating information is unavailable for this showtime. Please choose another showtime or contact the cinema administrator.
-              </p>
-            ) : (
+          <section className={`combined-section combined-status-panel status-${status.toLowerCase().replace("_", "-")}`} role="status">
+            {status === MOVIE_STATUS.COMING_SOON && (
               <>
-                <ViewToggle value={viewMode} onChange={changeView} />
-                <div className="combined-selected-screening"><strong>{showtimeDetails.hall.name || "Cinema Hall"}</strong><span>{showtimeDetails.date} · {showtimeDetails.startTime}</span></div>
-                {is3D ? (
-                  <div className="combined-seat-map sp-embed">
-                    <Suspense fallback={<p className="combined-empty">Loading 3D seats…</p>}>
-                      <SeatPicker seats={pickerSeats} mode="3d" onConfirm={confirmPickedSeats} busy={isSubmitting} />
-                    </Suspense>
-                  </div>
-                ) : (
-                  <div className="combined-seat-map"><SeatMap rows={Number(showtimeDetails.hall.rows)} seatsPerRow={Number(showtimeDetails.hall.seatsPerRow)} bookedSeats={bookedSeats} selectedSeats={selectedSeats} onToggle={toggleSeat} /></div>
-                )}
+                <h2>Coming soon</h2>
+                <p>
+                  You can read about this movie now, but booking isn&apos;t open yet.
+                  {movie.releaseDate && <> Booking opens on <strong>{formatDate(movie.releaseDate)}</strong>.</>}
+                </p>
               </>
             )}
-          </>
-        )}
-      </section>
+            {status === MOVIE_STATUS.ENDED && (
+              <>
+                <h2>No longer showing</h2>
+                <p>
+                  This movie has finished its run
+                  {movie.endDate && <> (ended <strong>{formatDate(movie.endDate)}</strong>)</>} and can no longer be booked.
+                </p>
+              </>
+            )}
+            {status === MOVIE_STATUS.ARCHIVED && (
+              <>
+                <h2>Archived</h2>
+                <p>This movie is archived and is no longer available for booking.</p>
+              </>
+            )}
+            <Link className="combined-back-link" to="/">Browse movies now showing</Link>
+          </section>
+        </>
+      ) : (
+        <>
+          {/* Concise movie header */}
+          <header className="cb-head">
+            <img src={movie.poster || "https://placehold.co/400x600?text=Movie"} alt={`${movie.title} poster`} />
+            <div>
+              <div className="cb-head-top">
+                <span className="combined-eyebrow">{MOVIE_STATUS_LABELS[status].toUpperCase()}</span>
+                <h1>{movie.title}</h1>
+              </div>
+              <div className="combined-meta">
+                {genreText && <span>{genreText}</span>}
+                {movie.duration && <span>{movie.duration} min</span>}
+                {movie.rating && <span>{movie.rating}</span>}
+                {movie.endDate && <span>Showing until {formatDate(movie.endDate)}</span>}
+              </div>
+              <p className={`cb-desc ${descOpen ? "is-open" : ""}`}>{description}</p>
+              {description.length > 150 && (
+                <button type="button" className="cb-more" aria-expanded={descOpen} onClick={() => setDescOpen((open) => !open)}>
+                  {descOpen ? "Show less" : "Read more"}
+                </button>
+              )}
+            </div>
+          </header>
 
-      {error && <div className="combined-error-banner" role="alert">{error}</div>}
+          {/* Date tabs + time chips: pinned while you scroll the seats */}
+          <section className="cb-when" id="showtimes-section" aria-label="Showtimes">
+            <ShowtimePicker
+              groups={showtimeGroups}
+              selectedId={selectedShowtimeId}
+              activeDate={activeDate}
+              today={now}
+              onSelect={selectShowtime}
+            />
+          </section>
 
-      {!is3D && (
-        <section className="combined-checkout">
-          <div className="combined-checkout-seats"><span className="combined-eyebrow">YOUR SELECTION</span><strong>{showtimeDetails?.hall?.name || "Cinema Hall"} - {selectedSeats.length ? selectedSeats.join(", ") : "No seats selected"}</strong><small> {selectedSeats.length} {selectedSeats.length === 1 ? "seat" : "seats"} · No payment required</small></div>
-          <div className="combined-checkout-total"><span>Total</span><strong>RM {total.toFixed(2)}</strong></div>
-          <button className="combined-confirm-button" onClick={confirmBooking} disabled={!selectedShowtimeId || !selectedSeats.length || seatLoading || isSubmitting}>
-            {isSubmitting ? "Creating booking…" : user ? "Confirm Booking →" : "Login to Confirm →"}
-          </button>
-        </section>
-      )}
-      <p className="combined-auth-note">{user ? `Signed in as ${user.name || user.email}.` : "You'll be asked to log in or register before your booking is created. Your selection will be kept."}</p>
+          {/* Seat map (left) + 3D hall preview (right) */}
+          <section className="combined-seats-section">
+            <div className="cb-seating-head">
+              <h2>Select your seats</h2>
+              <div className="cb-seating-tools">
+                {showtimeDetails && <span className={`combined-live-status ${connected ? "is-live" : ""}`}><i />{connected ? "Live seat updates" : "Connecting to live seating"}</span>}
+                {selectedShowtimeId && <PreviewSwitch checked={showPreview} onChange={setShowPreview} />}
+              </div>
+            </div>
+            {!selectedShowtimeId ? <p className="combined-empty">Choose a showtime above to see its seating plan.</p> : seatLoading || !showtimeDetails ? <p className="combined-empty">Loading the seating plan…</p> : (
+              !hallReady ? (
+                <p className="combined-empty combined-error" role="alert">
+                  Hall seating information is unavailable for this showtime. Please choose another showtime or contact the cinema administrator.
+                </p>
+              ) : (
+                <div className={`cb-seatgrid ${showPreview ? "has-preview" : ""}`}>
+                  <div
+                    className="combined-seat-map"
+                    onMouseOver={(event) => setHoverId(seatIdFromEvent(event))}
+                    onMouseLeave={() => setHoverId(null)}
+                    onFocus={(event) => setHoverId(seatIdFromEvent(event))}
+                    onBlur={() => setHoverId(null)}
+                  >
+                    <SeatMap rows={Number(showtimeDetails.hall.rows)} seatsPerRow={Number(showtimeDetails.hall.seatsPerRow)} bookedSeats={bookedSeats} selectedSeats={selectedSeats} onToggle={toggleSeat} />
+                  </div>
+                  {showPreview && (
+                    <div className="cb-preview">
+                      <SeatPreview3D seats={previewSeats} selected={selectedSeats} hoverId={hoverId} />
+                    </div>
+                  )}
+                </div>
+              )
+            )}
+          </section>
+
+          {error && <div className="combined-error-banner" role="alert">{error}</div>}
+
+          <section className="combined-checkout">
+            <div className="combined-checkout-seats"><span className="combined-eyebrow">YOUR SELECTION</span><strong>{showtimeDetails?.hall?.name || "Cinema Hall"} - {selectedSeats.length ? selectedSeats.join(", ") : "No seats selected"}</strong><small> {selectedSeats.length} {selectedSeats.length === 1 ? "seat" : "seats"} · No payment required</small></div>
+            <div className="combined-checkout-total"><span>Total</span><strong>RM {total.toFixed(2)}</strong></div>
+            <button className="combined-confirm-button" onClick={confirmBooking} disabled={!selectedShowtimeId || !selectedSeats.length || seatLoading || isSubmitting}>
+              {isSubmitting ? "Creating booking…" : user ? "Confirm Booking →" : "Login to Confirm →"}
+            </button>
+          </section>
+          <p className="combined-auth-note">{user ? `Signed in as ${user.name || user.email}.` : "You'll be asked to log in or register before your booking is created. Your selection will be kept."}</p>
+
+          {dialogMessage && <NoticeDialog message={dialogMessage} onClose={closeDialog} />}
         </>
       )}
     </div>
