@@ -42,8 +42,8 @@ export default function MyBookings() {
 
   const fetchBookings = async () => {
     const data = await api("/bookings/my");
-    setBookings(data);
-    return data;
+    setBookings(Array.isArray(data) ? data : data.bookings || []);
+    return Array.isArray(data) ? data : data.bookings || [];
   };
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export default function MyBookings() {
         const data = await api("/bookings/my");
 
         if (!cancelled) {
-          setBookings(data);
+          setBookings(Array.isArray(data) ? data : data.bookings || []);
         }
       } catch (err) {
         console.error("Failed to load bookings:", err);
