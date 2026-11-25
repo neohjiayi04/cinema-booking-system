@@ -378,38 +378,40 @@ function MovieDetails({ movieId }) {
         </>
       ) : (
         <>
-          {/* Concise movie header */}
-          <header className="cb-head">
-            <img src={movie.poster || "https://placehold.co/400x600?text=Movie"} alt={`${movie.title} poster`} />
-            <div>
-              <div className="cb-head-top">
+          {/* One card: big poster on the left, movie details and showtimes on the right */}
+          <section className="cb-hero">
+            <div className="cb-hero-poster">
+              <img src={movie.poster || "https://placehold.co/400x600?text=Movie"} alt={`${movie.title} poster`} />
+            </div>
+            <div className="cb-hero-body">
+              <div className="cb-hero-info">
                 <span className="combined-eyebrow">{MOVIE_STATUS_LABELS[status].toUpperCase()}</span>
                 <h1>{movie.title}</h1>
+                <div className="combined-meta">
+                  {genreText && <span>{genreText}</span>}
+                  {movie.duration && <span>{movie.duration} min</span>}
+                  {movie.rating && <span>{movie.rating}</span>}
+                  {movie.endDate && <span>Showing until {formatDate(movie.endDate)}</span>}
+                </div>
+                <p className={`cb-desc ${descOpen ? "is-open" : ""}`}>{description}</p>
+                {description.length > 150 && (
+                  <button type="button" className="cb-more" aria-expanded={descOpen} onClick={() => setDescOpen((open) => !open)}>
+                    {descOpen ? "Show less" : "Read more"}
+                  </button>
+                )}
               </div>
-              <div className="combined-meta">
-                {genreText && <span>{genreText}</span>}
-                {movie.duration && <span>{movie.duration} min</span>}
-                {movie.rating && <span>{movie.rating}</span>}
-                {movie.endDate && <span>Showing until {formatDate(movie.endDate)}</span>}
-              </div>
-              <p className={`cb-desc ${descOpen ? "is-open" : ""}`}>{description}</p>
-              {description.length > 150 && (
-                <button type="button" className="cb-more" aria-expanded={descOpen} onClick={() => setDescOpen((open) => !open)}>
-                  {descOpen ? "Show less" : "Read more"}
-                </button>
-              )}
-            </div>
-          </header>
 
-          {/* Date tabs + time chips: pinned while you scroll the seats */}
-          <section className="cb-when" id="showtimes-section" aria-label="Showtimes">
-            <ShowtimePicker
-              groups={showtimeGroups}
-              selectedId={selectedShowtimeId}
-              activeDate={activeDate}
-              today={now}
-              onSelect={selectShowtime}
-            />
+              <section className="cb-when" id="showtimes-section" aria-label="Showtimes">
+                <span className="cb-when-label">Choose a showtime</span>
+                <ShowtimePicker
+                  groups={showtimeGroups}
+                  selectedId={selectedShowtimeId}
+                  activeDate={activeDate}
+                  today={now}
+                  onSelect={selectShowtime}
+                />
+              </section>
+            </div>
           </section>
 
           {/* Seat map (left) + 3D hall preview (right) */}
