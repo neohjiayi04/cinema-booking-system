@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../services/api.js";
+import PopupHost, { useConfirm } from "../../components/Popup.jsx";
 
 const EMPTY_FORM = {
   name: "",
@@ -19,6 +20,8 @@ export default function Halls() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const [askConfirm, confirmDialog] = useConfirm();
 
   const formRef = useRef(null);
   const nameRef = useRef(null);
@@ -165,7 +168,15 @@ export default function Halls() {
 
   /* DELETE */
   async function remove(hall) {
-    if (!window.confirm(`Delete "${hall.name}"? This cannot be undone.`)) {
+    const ok = await askConfirm({
+      title: "Delete this hall?",
+      message: `"${hall.name}" will be permanently deleted. This cannot be undone.`,
+      confirmText: "Delete",
+      tone: "danger",
+      icon: "trash",
+    });
+
+    if (!ok) {
       return;
     }
 
@@ -220,6 +231,15 @@ export default function Halls() {
 
   return (
     <section>
+      {/* Centered pop-up messages */}
+      <PopupHost
+        error={error}
+        notice={message}
+        onCloseError={() => setError("")}
+        onCloseNotice={() => setMessage("")}
+      />
+      {confirmDialog}
+
       <div className="admin-page-header">
         <div>
           <h1>Halls</h1>
@@ -229,24 +249,6 @@ export default function Halls() {
           </p>
         </div>
       </div>
-
-      {message && (
-        <div
-          className="admin-alert admin-alert-success admin-hall-alert"
-          role="status"
-        >
-          {message}
-        </div>
-      )}
-
-      {error && (
-        <div
-          className="admin-alert admin-alert-error admin-hall-alert"
-          role="alert"
-        >
-          {error}
-        </div>
-      )}
 
       {/* Add / Edit form */}
       <div className="admin-panel" ref={formRef}>

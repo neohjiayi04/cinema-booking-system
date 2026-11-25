@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../services/api.js";
 import { MOVIE_STATUS } from "../../constants/movieOptions.js";
+import PopupHost, { useConfirm } from "../../components/Popup.jsx";
 
 const initialForm = {
   movieId: "",
@@ -128,6 +129,8 @@ export default function Showtimes() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const [askConfirm, confirmDialog] = useConfirm();
 
   const isEditing = editingId !== null;
 
@@ -264,11 +267,15 @@ export default function Showtimes() {
       showtime.movieTitle ||
       "this showtime";
 
-    const confirmed = window.confirm(
-      `Delete the showtime for "${movieTitle}" on ${showtime.date} at ${formatTime(
+    const confirmed = await askConfirm({
+      title: "Delete this showtime?",
+      message: `"${movieTitle}" on ${String(showtime.date || "").slice(0, 10)} at ${formatTime(
         showtime.startTime
-      )}?`
-    );
+      )} will be permanently deleted. This cannot be undone.`,
+      confirmText: "Delete",
+      tone: "danger",
+      icon: "trash",
+    });
 
     if (!confirmed) {
       return;
@@ -450,23 +457,14 @@ export default function Showtimes() {
         </div>
       </div>
 
-      {message && (
-        <div
-          className="admin-alert admin-alert-success admin-hall-alert"
-          role="status"
-        >
-          {message}
-        </div>
-      )}
-
-      {error && (
-        <div
-          className="admin-alert admin-alert-error admin-hall-alert"
-          role="alert"
-        >
-          {error}
-        </div>
-      )}
+      {/* Centered pop-up messages */}
+      <PopupHost
+        error={error}
+        notice={message}
+        onCloseError={() => setError("")}
+        onCloseNotice={() => setMessage("")}
+      />
+      {confirmDialog}
 
       <div className="admin-panel">
         <div className="admin-panel-header">

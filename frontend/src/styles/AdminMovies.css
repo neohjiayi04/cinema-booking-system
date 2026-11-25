@@ -6,7 +6,7 @@
    It re-uses the --admin-* tokens defined in admin.css.
 
     1. Page + local tokens        6. Poster preview
-    2. Centered pop-up message    7. Status tabs, search, filter
+    2. (pop-up: see Popup.css)    7. Status tabs, search, filter
     3. Cards                      8. Movie rows + badges
     4. Form fields (compact)      9. Row action buttons (incl. locked)
     5. Homepage featured card    10. Responsive
@@ -38,174 +38,6 @@
 
 .mv-icon {
   flex-shrink: 0;
-}
-
-/* 2. POP-UP MESSAGES (CENTERED)
-   A dimmed backdrop + a card in the middle of the screen. Success closes
-   itself (countdown bar), errors wait for the admin to click "Got it".
-   Click the backdrop, press Esc or click the button to close.
-   --------------------------------------------------------- */
-.mv-popup-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  display: grid;
-  padding: 20px;
-  place-items: center;
-  background: rgba(23, 22, 43, 0.5);
-  backdrop-filter: blur(4px);
-  animation: mv-fade-in 200ms ease both;
-}
-
-.mv-popup {
-  --mv-popup-color: #14935f;
-  --mv-popup-soft: rgba(20, 147, 95, 0.16);
-  --mv-popup-grad: linear-gradient(135deg, #2fd39a 0%, #12905c 100%);
-
-  position: relative;
-  width: min(420px, 100%);
-  padding: 40px 32px 32px;
-  overflow: hidden;
-  border-radius: 28px;
-  background: var(--admin-surface);
-  box-shadow:
-    0 40px 90px rgba(23, 22, 43, 0.4),
-    0 4px 14px rgba(23, 22, 43, 0.12);
-  text-align: center;
-  animation: mv-popup-in 460ms cubic-bezier(0.22, 1.35, 0.36, 1) both;
-}
-
-.mv-popup--error {
-  --mv-popup-color: #c92a4a;
-  --mv-popup-soft: rgba(201, 42, 74, 0.16);
-  --mv-popup-grad: linear-gradient(135deg, #f77590 0%, #c4223f 100%);
-}
-
-/* soft coloured glow behind the icon */
-.mv-popup::before {
-  position: absolute;
-  top: -90px;
-  left: 50%;
-  width: 320px;
-  height: 220px;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, var(--mv-popup-soft), transparent);
-  transform: translateX(-50%);
-  content: "";
-}
-
-.mv-popup-badge {
-  position: relative;
-  display: grid;
-  width: 88px;
-  height: 88px;
-  margin: 0 auto 22px;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--mv-popup-grad);
-  color: #fff;
-  box-shadow: 0 14px 30px var(--mv-popup-soft);
-  animation:
-    mv-popup-pop 560ms 140ms cubic-bezier(0.22, 1.6, 0.36, 1) both,
-    mv-popup-ring 1600ms 500ms ease-out 2;
-}
-
-.mv-popup-badge .mv-icon {
-  stroke-width: 2.6;
-}
-
-/* the tick draws itself */
-.mv-popup--success .mv-popup-badge .mv-icon path {
-  stroke-dasharray: 30;
-  stroke-dashoffset: 30;
-  animation: mv-popup-draw 480ms 360ms ease-out forwards;
-}
-
-.mv-page .mv-popup-title {
-  position: relative;
-  margin: 0 0 8px;
-  color: var(--admin-text);
-  font-family: var(--admin-font-display);
-  font-size: 26px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-.mv-page .mv-popup-text {
-  position: relative;
-  margin: 0 0 26px;
-  color: var(--admin-text-secondary);
-  font-size: 15px;
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-}
-
-.mv-popup-btn {
-  position: relative;
-  width: 100%;
-  min-height: 48px;
-  border: 0;
-  border-radius: 14px;
-  background: var(--mv-popup-grad);
-  color: #fff;
-  font-family: inherit;
-  font-size: 14.5px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  box-shadow: 0 10px 22px var(--mv-popup-soft);
-  cursor: pointer;
-  transition: transform var(--admin-transition), filter var(--admin-transition);
-}
-
-.mv-popup-btn:hover {
-  filter: brightness(1.06);
-  transform: translateY(-1px);
-}
-
-.mv-popup-btn:focus-visible {
-  outline: 3px solid var(--mv-popup-soft);
-  outline-offset: 3px;
-}
-
-/* countdown bar (success only) */
-.mv-popup-timer {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 5px;
-  background: var(--mv-popup-grad);
-  transform-origin: left center;
-  animation: mv-popup-timer var(--mv-popup-time, 4000ms) linear forwards;
-}
-
-@keyframes mv-fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes mv-popup-in {
-  from { opacity: 0; transform: translateY(24px) scale(0.88); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes mv-popup-pop {
-  from { opacity: 0; transform: scale(0.3) rotate(-18deg); }
-  to   { opacity: 1; transform: scale(1) rotate(0); }
-}
-
-@keyframes mv-popup-ring {
-  from { box-shadow: 0 14px 30px var(--mv-popup-soft), 0 0 0 0 var(--mv-popup-soft); }
-  to   { box-shadow: 0 14px 30px var(--mv-popup-soft), 0 0 0 26px transparent; }
-}
-
-@keyframes mv-popup-draw {
-  to { stroke-dashoffset: 0; }
-}
-
-@keyframes mv-popup-timer {
-  from { transform: scaleX(1); }
-  to   { transform: scaleX(0); }
 }
 
 /* 3. CARDS
@@ -1075,9 +907,5 @@
   .mv-actions-btns {
     flex-direction: column-reverse;
     align-items: stretch;
-  }
-
-  .mv-popup {
-    padding: 32px 22px 24px;
   }
 }

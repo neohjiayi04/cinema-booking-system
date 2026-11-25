@@ -9,6 +9,7 @@ import {
   formatDate,
   cleanError
 } from "../../constants/movieOptions.js";
+import PopupHost, { useConfirm } from "../../components/Popup.jsx";
 import "../../styles/AdminMovies.css";
 
 const empty = {
@@ -25,15 +26,9 @@ const empty = {
 
 const STATUS_TABS = ["ALL", "NOW_SHOWING", "COMING_SOON", "ENDED", "ARCHIVED"];
 
-// Success pop-ups close by themselves after this long (ms).
-// Error pop-ups stay until the admin closes them, so they can't be missed.
-const NOTICE_MS = 4000;
-
 /* Small inline icon set (24x24, stroke based) */
 const ICON_PATHS = {
-  check: <path d="M20 6 9 17l-5-5" />,
   x: <path d="M18 6 6 18M6 6l12 12" />,
-  alert: (<><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></>),
   info: (<><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></>),
   star: <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />,
   edit: (<><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></>),
@@ -66,43 +61,6 @@ function Icon({ name, size = 16 }) {
   );
 }
 
-/* Centered pop-up message (success / error) */
-function Popup({ type, message, onClose }) {
-  const isError = type === "error";
-
-  // Esc closes the pop-up
-  useEffect(() => {
-    const onKey = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div className="mv-popup-backdrop" onClick={onClose}>
-      <div
-        className={`mv-popup mv-popup--${type}`}
-        role={isError ? "alertdialog" : "status"}
-        aria-modal="true"
-        aria-labelledby="mv-popup-title"
-        onClick={(e) => e.stopPropagation()}
-        style={{ "--mv-popup-time": `${NOTICE_MS}ms` }}
-      >
-        <span className="mv-popup-badge">
-          <Icon name={isError ? "alert" : "check"} size={40} />
-        </span>
-        <h3 className="mv-popup-title" id="mv-popup-title">
-          {isError ? "Something went wrong" : "Success!"}
-        </h3>
-        <p className="mv-popup-text">{message}</p>
-        <button type="button" className="mv-popup-btn" onClick={onClose} autoFocus>
-          {isError ? "Got it" : "OK"}
-        </button>
-        {!isError && <span className="mv-popup-timer" aria-hidden="true" />}
-      </div>
-    </div>
-  );
-}
-
 export default function Movies() {
   const [movies, setMovies] = useState([]);
   const [form, setForm] = useState(empty);
@@ -110,6 +68,7 @@ export default function Movies() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [saving, setSaving] = useState(false);
+  const [askConfirm, confirmDialog] = useConfirm();
 
   // Search & Filter States
   const [searchQuery, setSearchQuery] = useState("");
@@ -125,13 +84,6 @@ export default function Movies() {
       .catch((e) => { if (!cancelled) setError(cleanError(e, "Unable to load movies.")); });
     return () => { cancelled = true; };
   }, []);
-
-  // Success pop-ups close themselves after a few seconds (errors wait for a click).
-  useEffect(() => {
-    if (!notice) return undefined;
-    const t = setTimeout(() => setNotice(""), NOTICE_MS);
-    return () => clearTimeout(t);
-  }, [notice]);
 
 
   // Business rule: the end date can't be earlier than the start date.
@@ -184,7 +136,14 @@ export default function Movies() {
   }
 
   async function remove(movie) {
-    if (!confirm("Delete this movie?")) return;
+    const ok = await askConfirm({
+      title: "Delete this movie?",
+      message: `"${movie.title}" will be permanently deleted. This cannot be undone.`,
+      confirmText: "Delete",
+      tone: "danger",
+      icon: "trash",
+    });
+    if (!ok) return;
     setError("");
     setNotice("");
     try {
@@ -198,7 +157,14 @@ export default function Movies() {
   }
 
   async function archive(movie) {
-    if (!confirm(`Archive "${movie.title}"? It will be hidden from customers and can't be booked. You can restore it later.`)) return;
+    const ok = await askConfirm({
+      title: "Archive this movie?",
+      message: `"${movie.title}" will be hidden from customers and can't be booked. You can restore it later.`,
+      confirmText: "Archive",
+      tone: "warning",
+      icon: "archive",
+    });
+    if (!ok) return;
     setError("");
     setNotice("");
     try {
@@ -259,9 +225,14 @@ export default function Movies() {
   return (
     <section>
       <div className="mv-page">
-        {/* Centered pop-up messages */}
-        {error && <Popup key={`e-${error}`} type="error" message={error} onClose={() => setError("")} />}
-        {!error && notice && <Popup key={`n-${notice}`} type="success" message={notice} onClose={() => setNotice("")} />}
+        {/* Centered pop-up messages + confirmation dialog (shared component) */}
+        <PopupHost
+          error={error}
+          notice={notice}
+          onCloseError={() => setError("")}
+          onCloseNotice={() => setNotice("")}
+        />
+        {confirmDialog}
 
         <div className="admin-page-header">
           <div>
