@@ -25,9 +25,9 @@ const empty = {
 
 const STATUS_TABS = ["ALL", "NOW_SHOWING", "COMING_SOON", "ENDED", "ARCHIVED"];
 
-// How long a pop-up message stays on screen (ms)
-const NOTICE_MS = 4200;
-const ERROR_MS = 7000;
+// Success pop-ups close by themselves after this long (ms).
+// Error pop-ups stay until the admin closes them, so they can't be missed.
+const NOTICE_MS = 4000;
 
 /* Small inline icon set (24x24, stroke based) */
 const ICON_PATHS = {
@@ -66,23 +66,39 @@ function Icon({ name, size = 16 }) {
   );
 }
 
-/* Pop-up message (success / error) */
-function Toast({ type, message, onClose }) {
+/* Centered pop-up message (success / error) */
+function Popup({ type, message, onClose }) {
   const isError = type === "error";
+
+  // Esc closes the pop-up
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
-    <div
-      className={`mv-toast mv-toast--${type}`}
-      role={isError ? "alert" : "status"}
-      style={{ "--mv-toast-time": `${isError ? ERROR_MS : NOTICE_MS}ms` }}
-    >
-      <span className="mv-toast-icon"><Icon name={isError ? "alert" : "check"} size={20} /></span>
-      <div className="mv-toast-body">
-        <strong className="mv-toast-title">{isError ? "Something went wrong" : "Success"}</strong>
-        <p className="mv-toast-text">{message}</p>
+    <div className="mv-popup-backdrop" onClick={onClose}>
+      <div
+        className={`mv-popup mv-popup--${type}`}
+        role={isError ? "alertdialog" : "status"}
+        aria-modal="true"
+        aria-labelledby="mv-popup-title"
+        onClick={(e) => e.stopPropagation()}
+        style={{ "--mv-popup-time": `${NOTICE_MS}ms` }}
+      >
+        <span className="mv-popup-badge">
+          <Icon name={isError ? "alert" : "check"} size={40} />
+        </span>
+        <h3 className="mv-popup-title" id="mv-popup-title">
+          {isError ? "Something went wrong" : "Success!"}
+        </h3>
+        <p className="mv-popup-text">{message}</p>
+        <button type="button" className="mv-popup-btn" onClick={onClose} autoFocus>
+          {isError ? "Got it" : "OK"}
+        </button>
+        {!isError && <span className="mv-popup-timer" aria-hidden="true" />}
       </div>
-      <button type="button" className="mv-toast-close" onClick={onClose} aria-label="Dismiss message">
-        <Icon name="x" size={16} />
-      </button>
     </div>
   );
 }
@@ -110,18 +126,13 @@ export default function Movies() {
     return () => { cancelled = true; };
   }, []);
 
-  // Pop-up messages close themselves after a few seconds.
+  // Success pop-ups close themselves after a few seconds (errors wait for a click).
   useEffect(() => {
     if (!notice) return undefined;
     const t = setTimeout(() => setNotice(""), NOTICE_MS);
     return () => clearTimeout(t);
   }, [notice]);
 
-  useEffect(() => {
-    if (!error) return undefined;
-    const t = setTimeout(() => setError(""), ERROR_MS);
-    return () => clearTimeout(t);
-  }, [error]);
 
   // Business rule: the end date can't be earlier than the start date.
   const dateError =
@@ -248,11 +259,9 @@ export default function Movies() {
   return (
     <section>
       <div className="mv-page">
-        {/* Pop-up messages */}
-        <div className="mv-toast-stack">
-          {error && <Toast key={`e-${error}`} type="error" message={error} onClose={() => setError("")} />}
-          {notice && <Toast key={`n-${notice}`} type="success" message={notice} onClose={() => setNotice("")} />}
-        </div>
+        {/* Centered pop-up messages */}
+        {error && <Popup key={`e-${error}`} type="error" message={error} onClose={() => setError("")} />}
+        {!error && notice && <Popup key={`n-${notice}`} type="success" message={notice} onClose={() => setNotice("")} />}
 
         <div className="admin-page-header">
           <div>
@@ -292,111 +301,99 @@ export default function Movies() {
               <p className="mv-hint">Paste a valid image URL on the right to preview.</p>
             </div>
 
-            {/* Right Side: Form Fields */}
+            {/* Right Side: Form Fields (compact: 4 rows) */}
             <div className="mv-fields">
-              {/* Group 1: details */}
-              <div className="mv-group">
-                <div className="mv-group-title">Movie details</div>
-                <div className="mv-grid">
-                  <div className="mv-field mv-col-6">
-                    <label className="mv-label" htmlFor="movie-title">Title</label>
-                    <input id="movie-title" className="mv-input" placeholder="Enter movie title" value={form.title} onChange={e => setForm({...form,title:e.target.value})} required />
-                  </div>
+              <div className="mv-grid">
+                <div className="mv-field mv-col-title">
+                  <label className="mv-label" htmlFor="movie-title">Title</label>
+                  <input id="movie-title" className="mv-input" placeholder="Enter movie title" value={form.title} onChange={e => setForm({...form,title:e.target.value})} required />
+                </div>
 
-                  <div className="mv-field mv-col-3">
-                    <label className="mv-label" htmlFor="movie-genre">Genre</label>
-                    <select id="movie-genre" className="mv-input mv-select" value={form.genre} onChange={e => setForm({...form,genre:e.target.value})} required>
-                      <option value="" disabled>Select genre</option>
-                      {genreOptions.map(g => (
-                        <option key={g} value={g}>{GENRES.includes(g) ? g : `${g} (current)`}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="mv-field mv-col-genre">
+                  <label className="mv-label" htmlFor="movie-genre">Genre</label>
+                  <select id="movie-genre" className="mv-input mv-select" value={form.genre} onChange={e => setForm({...form,genre:e.target.value})} required>
+                    <option value="" disabled>Select genre</option>
+                    {genreOptions.map(g => (
+                      <option key={g} value={g}>{GENRES.includes(g) ? g : `${g} (current)`}</option>
+                    ))}
+                  </select>
+                </div>
 
-                  <div className="mv-field mv-col-3">
-                    <label className="mv-label" htmlFor="movie-rating">Rating</label>
-                    <select id="movie-rating" className="mv-input mv-select" value={form.rating} onChange={e => setForm({...form,rating:e.target.value})} required>
-                      <option value="" disabled>Select rating</option>
-                      {ratingOptions.map(r => (
-                        <option key={r} value={r}>{RATINGS.includes(r) ? r : `${r} (current)`}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="mv-field mv-col-rating">
+                  <label className="mv-label" htmlFor="movie-rating">Rating</label>
+                  <select id="movie-rating" className="mv-input mv-select" value={form.rating} onChange={e => setForm({...form,rating:e.target.value})} required>
+                    <option value="" disabled>Select rating</option>
+                    {ratingOptions.map(r => (
+                      <option key={r} value={r}>{RATINGS.includes(r) ? r : `${r} (current)`}</option>
+                    ))}
+                  </select>
+                </div>
 
-                  <div className="mv-field mv-col-3">
-                    <label className="mv-label" htmlFor="movie-duration">Duration (minutes)</label>
-                    <input id="movie-duration" className="mv-input" placeholder="120" type="number" min="1" max="600" value={form.duration} onChange={e => setForm({...form,duration:e.target.value})} />
-                  </div>
+                <div className="mv-field mv-col-duration">
+                  <label className="mv-label" htmlFor="movie-duration">Duration (min)</label>
+                  <input id="movie-duration" className="mv-input" placeholder="120" type="number" min="1" max="600" value={form.duration} onChange={e => setForm({...form,duration:e.target.value})} />
+                </div>
 
-                  <div className="mv-field mv-col-9">
-                    <label className="mv-label" htmlFor="movie-poster">Poster URL</label>
-                    <input id="movie-poster" className="mv-input" placeholder="https://image-url.com/poster.jpg" value={form.poster} onChange={e => setForm({...form,poster:e.target.value})} />
-                  </div>
+                <div className="mv-field mv-col-full">
+                  <label className="mv-label" htmlFor="movie-poster">Poster URL</label>
+                  <input id="movie-poster" className="mv-input" placeholder="https://image-url.com/poster.jpg" value={form.poster} onChange={e => setForm({...form,poster:e.target.value})} />
+                </div>
 
-                  <div className="mv-field mv-col-12">
-                    <label className="mv-label" htmlFor="movie-description">Description</label>
-                    <textarea id="movie-description" className="mv-input mv-textarea" placeholder="Enter movie description..." value={form.description} onChange={e => setForm({...form,description:e.target.value})} rows={3} />
-                  </div>
+                <div className="mv-field mv-col-date">
+                  <label className="mv-label" htmlFor="movie-start">Start Date (Release)</label>
+                  <input id="movie-start" className="mv-input" type="date" value={form.releaseDate} onChange={e => setForm({...form,releaseDate:e.target.value})} required />
+                </div>
+
+                <div className="mv-field mv-col-date">
+                  <label className="mv-label" htmlFor="movie-end">End Date</label>
+                  <input id="movie-end" className="mv-input" type="date" min={form.releaseDate || undefined} value={form.endDate} onChange={e => setForm({...form,endDate:e.target.value})} required aria-invalid={Boolean(dateError)} />
+                  {dateError && <span className="mv-field-error" role="alert">{dateError}</span>}
+                </div>
+
+                <div className="mv-field mv-col-feature">
+                  <span className="mv-label">Homepage Featured Movie</span>
+                  <label className={`mv-feature ${form.featured ? "is-on" : ""}`}>
+                    <input
+                      type="checkbox"
+                      className="mv-feature-input"
+                      checked={form.featured}
+                      onChange={e => setForm({ ...form, featured: e.target.checked })}
+                    />
+                    <span className="mv-feature-icon"><Icon name="star" size={18} /></span>
+                    <span className="mv-feature-text">Display this movie as a Featured movie on the homepage</span>
+                    <span className="mv-switch" aria-hidden="true" />
+                  </label>
+                </div>
+
+                <div className="mv-field mv-col-full">
+                  <label className="mv-label" htmlFor="movie-description">Description</label>
+                  <textarea id="movie-description" className="mv-input mv-textarea" placeholder="Enter movie description..." value={form.description} onChange={e => setForm({...form,description:e.target.value})} rows={2} />
                 </div>
               </div>
 
-              {/* Group 2: schedule */}
-              <div className="mv-group">
-                <div className="mv-group-title">Schedule</div>
-                <div className="mv-grid">
-                  <div className="mv-field mv-col-6">
-                    <label className="mv-label" htmlFor="movie-start">Start Date (Release)</label>
-                    <input id="movie-start" className="mv-input" type="date" value={form.releaseDate} onChange={e => setForm({...form,releaseDate:e.target.value})} required />
-                  </div>
-
-                  <div className="mv-field mv-col-6">
-                    <label className="mv-label" htmlFor="movie-end">End Date</label>
-                    <input id="movie-end" className="mv-input" type="date" min={form.releaseDate || undefined} value={form.endDate} onChange={e => setForm({...form,endDate:e.target.value})} required aria-invalid={Boolean(dateError)} />
-                    {dateError && <span className="mv-field-error" role="alert">{dateError}</span>}
-                  </div>
-                </div>
-
+              {/* Status note + buttons share one row */}
+              <div className="mv-actions">
                 <p className="mv-note">
-                  <Icon name="info" size={18} />
+                  <Icon name="info" size={16} />
                   <span>
                     Status is automatic: <strong>Coming Soon</strong> before the start date,
                     {" "}<strong>Now Showing</strong> between the start and end dates, and
                     {" "}<strong>Ended</strong> after the end date. Only Now Showing movies can be booked.
                   </span>
                 </p>
-              </div>
 
-              {/* Group 3: homepage */}
-              <div className="mv-group">
-                <div className="mv-group-title">Homepage</div>
-                <label className={`mv-feature ${form.featured ? "is-on" : ""}`}>
-                  <input
-                    type="checkbox"
-                    className="mv-feature-input"
-                    checked={form.featured}
-                    onChange={e => setForm({ ...form, featured: e.target.checked })}
-                  />
-                  <span className="mv-feature-icon"><Icon name="star" size={22} /></span>
-                  <span className="mv-feature-text">
-                    <span className="mv-feature-title">Homepage Featured Movie</span>
-                    <span className="mv-feature-desc">Display this movie as a Featured movie on the homepage</span>
-                  </span>
-                  <span className="mv-feature-state">{form.featured ? "Featured" : "Not featured"}</span>
-                  <span className="mv-switch" aria-hidden="true" />
-                </label>
-              </div>
-
-              <div className="mv-actions">
-                <button className="mv-btn mv-btn--primary" disabled={saving || Boolean(dateError)}>{editing ? "Update Movie" : "Add Movie"}</button>
-                {editing && (
-                  <button
-                    type="button"
-                    onClick={() => { setEditing(null); setForm(empty); setError(""); }}
-                    className="mv-btn mv-btn--ghost"
-                  >
-                    Cancel
-                  </button>
-                )}
+                <div className="mv-actions-btns">
+                  <button className="mv-btn mv-btn--primary" disabled={saving || Boolean(dateError)}>{editing ? "Update Movie" : "Add Movie"}</button>
+                  {editing && (
+                    <button
+                      type="button"
+                      onClick={() => { setEditing(null); setForm(empty); setError(""); }}
+                      className="mv-btn mv-btn--ghost"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </form>
