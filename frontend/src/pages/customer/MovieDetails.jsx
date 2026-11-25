@@ -1,11 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import SeatMap from "../../components/SeatMap.jsx";
+import ViewToggle from "../../components/SeatPicker/ViewToggle.jsx";
 import { api } from "../../services/api.js";
 import { connectShowtime } from "../../services/websocket.js";
 import { MOVIE_STATUS, MOVIE_STATUS_LABELS, statusOf, formatDate } from "../../constants/movieOptions.js";
 import "../../styles/MovieDetails.css";
+
+// lazy: the 3D code (three.js) only downloads when the customer switches to the 3D view
+const SeatPicker = lazy(() => import("../../components/SeatPicker/SeatPicker.jsx"));
 
 const PENDING_KEY = "cinemax.pendingBooking";
 
@@ -39,6 +43,7 @@ function MovieDetails({ movieId }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [resumeReady, setResumeReady] = useState(false);
+  const [viewMode, setViewMode] = useState("2d"); // "2d" = your flat SeatMap (default), "3d" = SeatPicker with the 3D view
   const resumedRef = useRef(false);
 
   // Load movie + showtimes (runs once per mount; remounts when movieId changes)
@@ -105,8 +110,31 @@ function MovieDetails({ movieId }) {
     [selectedSeats, showtimeDetails]
   );
 
+  // The same seats in the shape the 3D SeatPicker expects (ids are your seat labels, e.g. "F06").
+  const pickerSeats = useMemo(() => {
+    const hall = showtimeDetails?.hall;
+    if (!hall) return [];
+    const result = [];
+    for (let row = 0; row < Number(hall.rows); row++) {
+      const rowLabel = String.fromCharCode(65 + row);
+      for (let seatNumber = 1; seatNumber <= Number(hall.seatsPerRow); seatNumber++) {
+        const label = `${rowLabel}${String(seatNumber).padStart(2, "0")}`;
+        result.push({
+          _id: label,
+          row: rowLabel,
+          number: seatNumber,
+          price: Number(showtimeDetails.price || 0),
+          status: bookedSeats.includes(label) ? "booked" : "available",
+          seatType: "STANDARD"
+        });
+      }
+    }
+    return result;
+  }, [showtimeDetails, bookedSeats]);
+
+  // Returns the error message when the booking fails (undefined on success, because we navigate away).
   const createBooking = useCallback(async (showtimeId, seats) => {
-    if (!showtimeId || !seats?.length || isSubmitting) return;
+    if (!showtimeId || !seats?.length || isSubmitting) return undefined;
     setError("");
     setIsSubmitting(true);
     try {
@@ -116,10 +144,13 @@ function MovieDetails({ movieId }) {
       });
       sessionStorage.removeItem(PENDING_KEY);
       navigate(`/booking-confirmation/${booking._id}`, { replace: true });
+      return undefined;
     } catch (e) {
-      setError(e.message || "Booking failed. Please check seat availability and try again.");
+      const message = e.message || "Booking failed. Please check seat availability and try again.";
+      setError(message);
       setIsSubmitting(false);
       resumedRef.current = true;
+      return message;
     }
   }, [isSubmitting, navigate]);
 
@@ -152,20 +183,41 @@ function MovieDetails({ movieId }) {
       : [...previous, seat]);
   }
 
+  // The two views keep their own selections, so switching starts a fresh pick.
+  function changeView(mode) {
+    if (mode === viewMode) return;
+    setViewMode(mode);
+    setSelectedSeats([]);
+    setError("");
+  }
+
+  // Saves the seats and sends a logged-out customer to log in; returns true if it did.
+  function redirectToLogin(seats) {
+    if (user) return false;
+    sessionStorage.setItem(PENDING_KEY, JSON.stringify({
+      movieId,
+      showtimeId: selectedShowtimeId,
+      seats
+    }));
+    const returnTo = `/movies/${movieId}?resumeBooking=1`;
+    navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
+    return true;
+  }
+
   function confirmBooking() {
     if (!selectedShowtimeId || !selectedSeats.length || isSubmitting) return;
     setError("");
-    if (!user) {
-      sessionStorage.setItem(PENDING_KEY, JSON.stringify({
-        movieId,
-        showtimeId: selectedShowtimeId,
-        seats: selectedSeats
-      }));
-      const returnTo = `/movies/${movieId}?resumeBooking=1`;
-      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`);
-      return;
-    }
+    if (redirectToLogin(selectedSeats)) return;
     createBooking(selectedShowtimeId, selectedSeats);
+  }
+
+  // 3D view: the SeatPicker's own Book button ends up here.
+  async function confirmPickedSeats(picked) {
+    if (!selectedShowtimeId || !picked.length || isSubmitting) return;
+    const seatIds = picked.map((seat) => seat.raw._id);
+    if (redirectToLogin(seatIds)) return;
+    const failure = await createBooking(selectedShowtimeId, seatIds);
+    if (failure) throw new Error(failure);
   }
 
   if (loading) return <div className="combined-state">Loading movie and showtimes…</div>;
@@ -173,6 +225,7 @@ function MovieDetails({ movieId }) {
 
   const status = statusOf(movie);
   const bookable = movie.bookable ?? status === MOVIE_STATUS.NOW_SHOWING;
+  const is3D = viewMode === "3d";
 
   return (
     <div className="combined-booking-page">
@@ -275,8 +328,17 @@ function MovieDetails({ movieId }) {
               </p>
             ) : (
               <>
+                <ViewToggle value={viewMode} onChange={changeView} />
                 <div className="combined-selected-screening"><strong>{showtimeDetails.hall.name || "Cinema Hall"}</strong><span>{showtimeDetails.date} · {showtimeDetails.startTime}</span></div>
-                <div className="combined-seat-map"><SeatMap rows={Number(showtimeDetails.hall.rows)} seatsPerRow={Number(showtimeDetails.hall.seatsPerRow)} bookedSeats={bookedSeats} selectedSeats={selectedSeats} onToggle={toggleSeat} /></div>
+                {is3D ? (
+                  <div className="combined-seat-map sp-embed">
+                    <Suspense fallback={<p className="combined-empty">Loading 3D seats…</p>}>
+                      <SeatPicker seats={pickerSeats} mode="3d" onConfirm={confirmPickedSeats} busy={isSubmitting} />
+                    </Suspense>
+                  </div>
+                ) : (
+                  <div className="combined-seat-map"><SeatMap rows={Number(showtimeDetails.hall.rows)} seatsPerRow={Number(showtimeDetails.hall.seatsPerRow)} bookedSeats={bookedSeats} selectedSeats={selectedSeats} onToggle={toggleSeat} /></div>
+                )}
               </>
             )}
           </>
@@ -285,13 +347,15 @@ function MovieDetails({ movieId }) {
 
       {error && <div className="combined-error-banner" role="alert">{error}</div>}
 
-      <section className="combined-checkout">
-        <div className="combined-checkout-seats"><span className="combined-eyebrow">YOUR SELECTION</span><strong>{showtimeDetails?.hall?.name || "Cinema Hall"} - {selectedSeats.length ? selectedSeats.join(", ") : "No seats selected"}</strong><small> {selectedSeats.length} {selectedSeats.length === 1 ? "seat" : "seats"} · No payment required</small></div>
-        <div className="combined-checkout-total"><span>Total</span><strong>RM {total.toFixed(2)}</strong></div>
-        <button className="combined-confirm-button" onClick={confirmBooking} disabled={!selectedShowtimeId || !selectedSeats.length || seatLoading || isSubmitting}>
-          {isSubmitting ? "Creating booking…" : user ? "Confirm Booking →" : "Login to Confirm →"}
-        </button>
-      </section>
+      {!is3D && (
+        <section className="combined-checkout">
+          <div className="combined-checkout-seats"><span className="combined-eyebrow">YOUR SELECTION</span><strong>{showtimeDetails?.hall?.name || "Cinema Hall"} - {selectedSeats.length ? selectedSeats.join(", ") : "No seats selected"}</strong><small> {selectedSeats.length} {selectedSeats.length === 1 ? "seat" : "seats"} · No payment required</small></div>
+          <div className="combined-checkout-total"><span>Total</span><strong>RM {total.toFixed(2)}</strong></div>
+          <button className="combined-confirm-button" onClick={confirmBooking} disabled={!selectedShowtimeId || !selectedSeats.length || seatLoading || isSubmitting}>
+            {isSubmitting ? "Creating booking…" : user ? "Confirm Booking →" : "Login to Confirm →"}
+          </button>
+        </section>
+      )}
       <p className="combined-auth-note">{user ? `Signed in as ${user.name || user.email}.` : "You'll be asked to log in or register before your booking is created. Your selection will be kept."}</p>
         </>
       )}
