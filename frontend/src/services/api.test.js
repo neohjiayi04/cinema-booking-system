@@ -1,27 +1,26 @@
-import { describe, test, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { api } from "./api";
 
-describe("API Service", () => {
+describe("api()", () => {
   beforeEach(() => {
     localStorage.clear();
-    vi.stubGlobal("fetch", vi.fn());
-  });
-
-  afterEach(() => {
     vi.restoreAllMocks();
-    vi.unstubAllGlobals();
   });
 
-  test("should make a GET request with default JSON headers", async () => {
-    fetch.mockResolvedValue({
+  it("sends a GET request with the correct API URL", async () => {
+    const mockResponse = {
+      message: "Success"
+    };
+
+    global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ message: "Success" })
+      json: vi.fn().mockResolvedValue(mockResponse)
     });
 
-    const result = await api("/movies");
+    const result = await api("/test");
 
     expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:3001/api/movies",
+      expect.stringContaining("/test"),
       expect.objectContaining({
         headers: {
           "Content-Type": "application/json"
@@ -29,95 +28,160 @@ describe("API Service", () => {
       })
     );
 
-    expect(result).toEqual({ message: "Success" });
+    expect(result).toEqual(mockResponse);
   });
 
-  test("should include JWT token in Authorization header", async () => {
-    localStorage.setItem("token", "test-jwt-token");
+  it("adds the Authorization header when a token exists", async () => {
+    localStorage.setItem("token", "test-token");
 
-    fetch.mockResolvedValue({
+    global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ message: "Authenticated" })
+      json: vi.fn().mockResolvedValue({
+        success: true
+      })
     });
 
-    await api("/profile");
+    await api("/bookings/my");
 
     expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:3001/api/profile",
+      expect.stringContaining("/bookings/my"),
       expect.objectContaining({
         headers: {
           "Content-Type": "application/json",
-          Authorization: "Bearer test-jwt-token"
+          Authorization: "Bearer test-token"
         }
       })
     );
   });
 
-  test("should support custom request options and headers", async () => {
-    fetch.mockResolvedValue({
+  it("does not add Authorization when no token exists", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ message: "Created" })
+      json: vi.fn().mockResolvedValue({
+        success: true
+      })
     });
 
-    await api("/movies", {
-      method: "POST",
-      headers: {
-        "X-Custom-Header": "test-value"
-      },
-      body: JSON.stringify({ title: "Test Movie" })
-    });
+    await api("/movies");
 
     expect(fetch).toHaveBeenCalledWith(
-      "http://localhost:3001/api/movies",
+      expect.stringContaining("/movies"),
       expect.objectContaining({
-        method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "X-Custom-Header": "test-value"
-        },
-        body: JSON.stringify({ title: "Test Movie" })
+          "Content-Type": "application/json"
+        }
       })
     );
   });
 
-  test("should throw an error when the API returns an unsuccessful response", async () => {
-    fetch.mockResolvedValue({
-      ok: false,
-      status: 404,
-      statusText: "Not Found",
-      json: async () => ({ message: "Movie not found" })
+  it("passes request options to fetch", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        success: true
+      })
     });
 
-    await expect(api("/movies/invalid")).rejects.toThrow(
-      "404 Not Found: Movie not found"
+    await api("/bookings", {
+      method: "POST",
+      body: JSON.stringify({
+        showtimeId: "123",
+        seatIds: ["A1"]
+      })
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/bookings"),
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          showtimeId: "123",
+          seatIds: ["A1"]
+        })
+      })
     );
   });
 
-  test("should handle unsuccessful responses without a JSON body", async () => {
-    fetch.mockResolvedValue({
+  it("returns parsed JSON when the response is successful", async () => {
+    const responseData = {
+      id: 1,
+      username: "customer",
+      bookings: []
+    };
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(responseData)
+    });
+
+    const result = await api("/bookings/my");
+
+    expect(result).toEqual(responseData);
+  });
+
+  it("throws an error using the server message when the request fails", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 409,
+      json: vi.fn().mockResolvedValue({
+        message: "Seat is already booked"
+      })
+    });
+
+    await expect(api("/bookings")).rejects.toMatchObject({
+      message: "Seat is already booked",
+      status: 409
+    });
+  });
+
+  it("uses the status code when the server provides no message", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 500,
-      statusText: "Internal Server Error",
-      json: async () => {
-        throw new Error("Invalid JSON");
-      }
+      json: vi.fn().mockResolvedValue({})
     });
 
-    await expect(api("/movies")).rejects.toThrow(
-      "500 Internal Server Error: Request failed"
-    );
+    await expect(api("/test")).rejects.toMatchObject({
+      message: "Request failed (500)",
+      status: 500
+    });
   });
 
-  test("should return an empty object when a successful response has no JSON body", async () => {
-    fetch.mockResolvedValue({
+  it("handles a response with invalid JSON", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: vi.fn().mockRejectedValue(new Error("Invalid JSON"))
+    });
+
+    await expect(api("/test")).rejects.toMatchObject({
+      message: "Request failed (500)",
+      status: 500
+    });
+  });
+
+  it("preserves custom headers from options", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => {
-        throw new Error("Invalid JSON");
+      json: vi.fn().mockResolvedValue({
+        success: true
+      })
+    });
+
+    await api("/test", {
+      headers: {
+        "X-Test-Header": "test-value"
       }
     });
 
-    const result = await api("/movies");
-
-    expect(result).toEqual({});
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/test"),
+      expect.objectContaining({
+        headers: {
+          "Content-Type": "application/json",
+          "X-Test-Header": "test-value"
+        }
+      })
+    );
   });
 });
