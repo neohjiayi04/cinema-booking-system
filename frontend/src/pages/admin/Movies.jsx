@@ -10,6 +10,7 @@ import {
   cleanError
 } from "../../constants/movieOptions.js";
 import PopupHost, { useConfirm } from "../../components/Popup.jsx";
+import ActionButton from "../../components/ActionButton.jsx";
 import "../../styles/AdminMovies.css";
 
 const empty = {
@@ -28,13 +29,8 @@ const STATUS_TABS = ["ALL", "NOW_SHOWING", "COMING_SOON", "ENDED", "ARCHIVED"];
 
 /* Small inline icon set (24x24, stroke based) */
 const ICON_PATHS = {
-  x: <path d="M18 6 6 18M6 6l12 12" />,
   info: (<><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></>),
   star: <path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />,
-  edit: (<><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" /></>),
-  archive: (<><rect x="2" y="3" width="20" height="5" rx="1" /><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4" /></>),
-  restore: (<><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></>),
-  trash: (<><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M10 11v6M14 11v6" /></>),
   lock: (<><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></>),
   calendar: (<><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></>),
   search: (<><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></>),
@@ -470,37 +466,35 @@ export default function Movies() {
                     </div>
 
                     <div className="mv-row-actions">
-                      <button className="mv-act mv-act--edit" onClick={() => edit(m)}>
-                        <Icon name="edit" size={15} /> Edit
-                      </button>
+                      <ActionButton variant="edit" onClick={() => edit(m)}>
+                        Edit
+                      </ActionButton>
 
                       {status === MOVIE_STATUS.ARCHIVED ? (
-                        <button className="mv-act mv-act--restore" onClick={() => restore(m)}>
-                          <Icon name="restore" size={15} /> Restore
-                        </button>
+                        <ActionButton variant="restore" onClick={() => restore(m)}>
+                          Restore
+                        </ActionButton>
                       ) : (
-                        <span className="mv-act-wrap" title={archiveReason}>
-                          <button
-                            className="mv-act mv-act--archive"
-                            onClick={() => archive(m)}
-                            disabled={locked}
-                            title={archiveReason}
-                          >
-                            <Icon name={locked ? "lock" : "archive"} size={15} /> Archive
-                          </button>
-                        </span>
+                        <ActionButton
+                          variant="archive"
+                          icon={locked ? "lock" : "archive"}
+                          onClick={() => archive(m)}
+                          disabled={locked}
+                          title={archiveReason}
+                        >
+                          Archive
+                        </ActionButton>
                       )}
 
-                      <span className="mv-act-wrap" title={deleteReason}>
-                        <button
-                          className="mv-act mv-act--delete"
-                          onClick={() => remove(m)}
-                          disabled={locked}
-                          title={deleteReason}
-                        >
-                          <Icon name={locked ? "lock" : "trash"} size={15} /> Delete
-                        </button>
-                      </span>
+                      <ActionButton
+                        variant="delete"
+                        icon={locked ? "lock" : "trash"}
+                        onClick={() => remove(m)}
+                        disabled={locked}
+                        title={deleteReason}
+                      >
+                        Delete
+                      </ActionButton>
                     </div>
                   </div>
                 );

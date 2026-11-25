@@ -853,11 +853,18 @@ body:has(.admin-layout) {
 .admin-table th:last-child,
 .admin-table td:last-child {
   padding-right: 28px;
-  text-align: right;
+  text-align: left;
 }
- 
-.admin-table td:last-child .admin-table-actions {
-  justify-content: flex-end;
+
+/* Actions column hugs its buttons, so no empty space is left on the right */
+.admin-table td:last-child:has(.admin-table-actions),
+.admin-table td:last-child:has(.app-act-group:not(.app-act-group--stack)) {
+  width: 1%;
+}
+
+.admin-table td:last-child .admin-table-actions,
+.admin-table td:last-child .app-act-group:not(.app-act-group--stack) {
+  justify-content: flex-start;
 }
  
 .admin-table tbody tr:last-child td {

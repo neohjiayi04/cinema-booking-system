@@ -733,10 +733,9 @@
 }
 
 /* 9. ROW ACTION BUTTONS
-   Edit = indigo, Archive = amber, Restore = green, Delete = red.
-   When a movie has bookings, Archive and Delete turn into a grey,
-   hatched, dashed-border "locked" button with a padlock icon, so they
-   can't be mistaken for clickable ones.
+   The buttons themselves (Edit, Archive, Restore, Delete, locked state)
+   are the shared ActionButton: see ActionButton.css. Only the row
+   container lives here.
    --------------------------------------------------------- */
 .mv-row-actions {
   display: flex;
@@ -744,99 +743,7 @@
   gap: 8px;
 }
 
-.mv-act-wrap {
-  display: inline-flex;
-}
-
-.mv-act {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--admin-border-strong);
-  border-radius: 10px;
-  background: var(--admin-surface);
-  color: var(--admin-text-secondary);
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: all var(--admin-transition);
-}
-
-.mv-act--edit {
-  border-color: var(--admin-accent-line);
-  background: var(--admin-accent-soft);
-  color: var(--admin-accent-text);
-}
-
-.mv-act--edit:hover {
-  background: var(--admin-accent);
-  color: #fff;
-}
-
-.mv-act--archive {
-  border-color: var(--mv-amber-line);
-  background: var(--mv-amber-bg);
-  color: var(--mv-amber);
-}
-
-.mv-act--archive:hover:not(:disabled) {
-  border-color: #f59e0b;
-  background: #f59e0b;
-  color: #fff;
-}
-
-.mv-act--restore {
-  border-color: rgba(24, 122, 82, 0.35);
-  background: var(--admin-success-bg);
-  color: var(--admin-success);
-}
-
-.mv-act--restore:hover {
-  border-color: var(--admin-success);
-  background: var(--admin-success);
-  color: #fff;
-}
-
-.mv-act--delete {
-  border-color: rgba(220, 38, 38, 0.4);
-  background: #fef2f2;
-  color: #dc2626;
-}
-
-.mv-act--delete:hover:not(:disabled) {
-  border-color: #ef4444;
-  background: #ef4444;
-  color: #fff;
-}
-
-/* locked (has bookings): same look for both, wins over every colour above */
-.mv-act:disabled {
-  border: 1px dashed var(--mv-lock-line);
-  background:
-    repeating-linear-gradient(135deg, transparent 0 6px, rgba(124, 122, 149, 0.09) 6px 12px),
-    var(--mv-lock-bg);
-  color: var(--mv-lock-text);
-  box-shadow: none;
-  cursor: not-allowed;
-  transform: none;
-  pointer-events: none; /* hover goes to the wrapper so its tooltip shows */
-}
-
-.mv-act:disabled .mv-icon {
-  opacity: 0.85;
-}
-
-.mv-act-wrap:has(.mv-act:disabled) {
-  cursor: not-allowed;
-}
-
 /* keyboard focus */
-.mv-act:focus-visible,
 .mv-tab:focus-visible,
 .mv-btn:focus-visible {
   outline: 2px solid var(--admin-accent-text);

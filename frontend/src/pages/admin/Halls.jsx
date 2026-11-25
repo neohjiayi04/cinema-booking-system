@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../services/api.js";
 import PopupHost, { useConfirm } from "../../components/Popup.jsx";
+import ActionButton from "../../components/ActionButton.jsx";
+import { getShowtimeStatus } from "../../constants/showtimeStatus.js";
 
 const EMPTY_FORM = {
   name: "",
@@ -12,8 +14,23 @@ const EMPTY_FORM = {
 
 const HALL_STATUSES = ["ACTIVE", "MAINTENANCE", "INACTIVE"];
 
+// Halls are required. Showtimes + movies only feed the "current showtimes"
+// column, so if they fail to load the page still works (count shows None).
+function fetchAll() {
+  return Promise.all([
+    api("/halls"),
+    api("/showtimes").catch(() => []),
+    api("/movies").catch(() => []),
+  ]);
+}
+
 export default function Halls() {
   const [halls, setHalls] = useState([]);
+  const [showtimes, setShowtimes] = useState([]);
+  const [movies, setMovies] = useState([]);
+
+  // "Now", refreshed every minute so finished showtimes drop out of the count
+  const [now, setNow] = useState(() => Date.now());
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +47,10 @@ export default function Halls() {
   /* READ */
   async function load() {
     try {
-      setHalls(await api("/halls"));
+      const [hallData, showtimeData, movieData] = await fetchAll();
+      setHalls(hallData);
+      setShowtimes(showtimeData);
+      setMovies(movieData);
     } catch (err) {
       setError(err.message || "Unable to load halls.");
     } finally {
@@ -41,9 +61,12 @@ export default function Halls() {
   useEffect(() => {
     let cancelled = false;
 
-    api("/halls")
-      .then((data) => {
-        if (!cancelled) setHalls(data);
+    fetchAll()
+      .then(([hallData, showtimeData, movieData]) => {
+        if (cancelled) return;
+        setHalls(hallData);
+        setShowtimes(showtimeData);
+        setMovies(movieData);
       })
       .catch((err) => {
         if (!cancelled) {
@@ -57,6 +80,11 @@ export default function Halls() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => clearInterval(timer);
   }, []);
 
   function setField(field) {
@@ -170,7 +198,13 @@ export default function Halls() {
   async function remove(hall) {
     const ok = await askConfirm({
       title: "Delete this hall?",
-      message: `"${hall.name}" will be permanently deleted. This cannot be undone.`,
+      message: `"${hall.name}" will be permanently deleted. ${
+        currentShowtimeCount(hall) > 0
+          ? `It still has ${currentShowtimeCount(hall)} current showtime${
+              currentShowtimeCount(hall) === 1 ? "" : "s"
+            }. `
+          : ""
+      }This cannot be undone.`,
       confirmText: "Delete",
       tone: "danger",
       icon: "trash",
@@ -201,6 +235,38 @@ export default function Halls() {
 
   const totalSeats = halls.reduce(
     (sum, hall) => sum + hall.rows * hall.seatsPerRow,
+    0
+  );
+
+  // hallId -> { upcoming, nowShowing }. Finished showtimes are not counted.
+  const movieById = new Map(movies.map((m) => [String(m._id), m]));
+  const showtimeStats = {};
+
+  for (const showtime of showtimes) {
+    const hallId = String(showtime.hallId || showtime.hall?._id || "");
+    if (!hallId) continue;
+
+    const movie =
+      showtime.movie || movieById.get(String(showtime.movieId || ""));
+
+    const status = getShowtimeStatus(showtime, Number(movie?.duration), now);
+    if (status !== "UPCOMING" && status !== "NOW_SHOWING") continue;
+
+    if (!showtimeStats[hallId]) {
+      showtimeStats[hallId] = { upcoming: 0, nowShowing: 0 };
+    }
+
+    if (status === "NOW_SHOWING") showtimeStats[hallId].nowShowing += 1;
+    else showtimeStats[hallId].upcoming += 1;
+  }
+
+  function currentShowtimeCount(hall) {
+    const stats = showtimeStats[String(hall._id)];
+    return stats ? stats.upcoming + stats.nowShowing : 0;
+  }
+
+  const totalCurrentShowtimes = halls.reduce(
+    (sum, hall) => sum + currentShowtimeCount(hall),
     0
   );
 
@@ -449,6 +515,7 @@ export default function Halls() {
                     <th>Total seats</th>
                     <th>Cleaning</th>
                     <th>Status</th>
+                    <th>Current showtimes</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -456,6 +523,8 @@ export default function Halls() {
                 <tbody>
                   {halls.map((hall) => {
                     const status = hall.status ?? "ACTIVE";
+                    const stats = showtimeStats[String(hall._id)];
+                    const currentCount = currentShowtimeCount(hall);
 
                     return (
                       <tr
@@ -491,22 +560,42 @@ export default function Halls() {
                         </td>
 
                         <td>
-                          <div className="admin-table-actions">
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn-secondary admin-btn-sm"
+                          {currentCount > 0 ? (
+                            <>
+                              <span
+                                className="admin-status admin-status-info"
+                                title={`${stats.upcoming} upcoming · ${stats.nowShowing} now showing`}
+                              >
+                                {currentCount}{" "}
+                                {currentCount === 1 ? "showtime" : "showtimes"}
+                              </span>
+
+                              {stats.nowShowing > 0 && (
+                                <div className="showtime-table-end">
+                                  {stats.nowShowing} playing now
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <span>None</span>
+                          )}
+                        </td>
+
+                        <td>
+                          <div className="app-act-group">
+                            <ActionButton
+                              variant="edit"
                               onClick={() => startEdit(hall)}
                             >
                               Edit
-                            </button>
+                            </ActionButton>
 
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn-danger admin-btn-sm"
+                            <ActionButton
+                              variant="delete"
                               onClick={() => remove(hall)}
                             >
                               Delete
-                            </button>
+                            </ActionButton>
                           </div>
                         </td>
                       </tr>
@@ -519,7 +608,8 @@ export default function Halls() {
             <div className="admin-table-footer">
               <span>
                 Total capacity: {totalSeats} seats across {halls.length}{" "}
-                {halls.length === 1 ? "hall" : "halls"}
+                {halls.length === 1 ? "hall" : "halls"} · {totalCurrentShowtimes}{" "}
+                current {totalCurrentShowtimes === 1 ? "showtime" : "showtimes"}
               </span>
             </div>
           </>

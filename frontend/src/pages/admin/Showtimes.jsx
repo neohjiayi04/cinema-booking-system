@@ -2,6 +2,11 @@ import { useEffect, useState } from "react";
 import { api } from "../../services/api.js";
 import { MOVIE_STATUS } from "../../constants/movieOptions.js";
 import PopupHost, { useConfirm } from "../../components/Popup.jsx";
+import ActionButton from "../../components/ActionButton.jsx";
+import {
+  getShowtimeStatus,
+  SHOWTIME_STATUS,
+} from "../../constants/showtimeStatus.js";
 
 const initialForm = {
   movieId: "",
@@ -127,6 +132,9 @@ export default function Showtimes() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // "Now", refreshed every minute so statuses update while the page is open
+  const [now, setNow] = useState(() => Date.now());
+
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -215,6 +223,11 @@ export default function Showtimes() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60 * 1000);
+    return () => clearInterval(timer);
   }, []);
 
   function setField(field) {
@@ -854,6 +867,7 @@ export default function Showtimes() {
                     <th>Time</th>
                     <th>Hall</th>
                     <th>Price</th>
+                    <th>Status</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -891,14 +905,23 @@ export default function Showtimes() {
                           )
                         : "";
 
+                    const statusKey = getShowtimeStatus(
+                      showtime,
+                      duration,
+                      now
+                    );
+
+                    const status = SHOWTIME_STATUS[statusKey];
+
                     return (
                       <tr
                         key={showtime._id}
-                        className={
-                          showtime._id === editingId
-                            ? "is-editing"
-                            : ""
-                        }
+                        className={[
+                          showtime._id === editingId ? "is-editing" : "",
+                          statusKey === "ENDED" ? "is-passed" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                       >
                         <td className="admin-cell-primary">
                           {movie?.title ||
@@ -938,26 +961,28 @@ export default function Showtimes() {
                         </td>
 
                         <td>
-                          <div className="admin-table-actions">
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn-secondary admin-btn-sm"
-                              onClick={() =>
-                                startEdit(showtime)
-                              }
+                          <span
+                            className={`admin-status ${status.className}`}
+                          >
+                            {status.label}
+                          </span>
+                        </td>
+
+                        <td>
+                          <div className="app-act-group">
+                            <ActionButton
+                              variant="edit"
+                              onClick={() => startEdit(showtime)}
                             >
                               Edit
-                            </button>
+                            </ActionButton>
 
-                            <button
-                              type="button"
-                              className="admin-btn admin-btn-danger admin-btn-sm"
-                              onClick={() =>
-                                remove(showtime)
-                              }
+                            <ActionButton
+                              variant="delete"
+                              onClick={() => remove(showtime)}
                             >
                               Delete
-                            </button>
+                            </ActionButton>
                           </div>
                         </td>
                       </tr>
