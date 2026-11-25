@@ -3,10 +3,7 @@ import { api } from "../../services/api.js";
 import { MOVIE_STATUS } from "../../constants/movieOptions.js";
 import PopupHost, { useConfirm } from "../../components/Popup.jsx";
 import ActionButton from "../../components/ActionButton.jsx";
-import {
-  getShowtimeStatus,
-  SHOWTIME_STATUS,
-} from "../../constants/showtimeStatus.js";
+import { getShowtimeStatus } from "../../constants/showtimeStatus.js";
 
 const initialForm = {
   movieId: "",
@@ -458,6 +455,11 @@ export default function Showtimes() {
     );
   });
 
+  const totalBookings = showtimes.reduce(
+    (sum, item) => sum + (Number(item.bookingCount) || 0),
+    0
+  );
+
   return (
     <section>
       <div className="admin-page-header">
@@ -867,7 +869,7 @@ export default function Showtimes() {
                     <th>Time</th>
                     <th>Hall</th>
                     <th>Price</th>
-                    <th>Status</th>
+                    <th>Bookings</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -911,7 +913,16 @@ export default function Showtimes() {
                       now
                     );
 
-                    const status = SHOWTIME_STATUS[statusKey];
+                    // bookingCount comes from the server (same idea as movies).
+                    // A showtime with bookings can't be deleted.
+                    const bookingCount = Number(showtime.bookingCount);
+                    const hasCount = Number.isFinite(bookingCount);
+                    const locked = hasCount && bookingCount > 0;
+                    const deleteReason = locked
+                      ? `This showtime has ${bookingCount} booking${
+                          bookingCount === 1 ? "" : "s"
+                        }, so it can't be deleted.`
+                      : "Delete showtime";
 
                     return (
                       <tr
@@ -961,11 +972,19 @@ export default function Showtimes() {
                         </td>
 
                         <td>
-                          <span
-                            className={`admin-status ${status.className}`}
-                          >
-                            {status.label}
-                          </span>
+                          {!hasCount ? (
+                            <span title="Booking count not available">—</span>
+                          ) : bookingCount > 0 ? (
+                            <span
+                              className="admin-status admin-status-success"
+                              title="Bookings can't be deleted with the showtime."
+                            >
+                              {bookingCount}{" "}
+                              {bookingCount === 1 ? "booking" : "bookings"}
+                            </span>
+                          ) : (
+                            <span>No bookings</span>
+                          )}
                         </td>
 
                         <td>
@@ -979,7 +998,10 @@ export default function Showtimes() {
 
                             <ActionButton
                               variant="delete"
+                              icon={locked ? "lock" : "trash"}
                               onClick={() => remove(showtime)}
+                              disabled={locked}
+                              title={deleteReason}
                             >
                               Delete
                             </ActionButton>
@@ -994,7 +1016,8 @@ export default function Showtimes() {
 
             <div className="admin-table-footer">
               <span>
-                Total showtimes: {showtimes.length}
+                Total showtimes: {showtimes.length} · {totalBookings}{" "}
+                {totalBookings === 1 ? "booking" : "bookings"}
               </span>
             </div>
           </>

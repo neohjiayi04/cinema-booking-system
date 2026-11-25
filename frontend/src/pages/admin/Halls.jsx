@@ -198,13 +198,7 @@ export default function Halls() {
   async function remove(hall) {
     const ok = await askConfirm({
       title: "Delete this hall?",
-      message: `"${hall.name}" will be permanently deleted. ${
-        currentShowtimeCount(hall) > 0
-          ? `It still has ${currentShowtimeCount(hall)} current showtime${
-              currentShowtimeCount(hall) === 1 ? "" : "s"
-            }. `
-          : ""
-      }This cannot be undone.`,
+      message: `"${hall.name}" will be permanently deleted. This cannot be undone.`,
       confirmText: "Delete",
       tone: "danger",
       icon: "trash",
@@ -238,7 +232,9 @@ export default function Halls() {
     0
   );
 
-  // hallId -> { upcoming, nowShowing }. Finished showtimes are not counted.
+  // hallId -> { upcoming, nowShowing, ended }.
+  // "Current" = upcoming + now showing (shown in the column).
+  // Ended showtimes are tracked separately because they still block deletion.
   const movieById = new Map(movies.map((m) => [String(m._id), m]));
   const showtimeStats = {};
 
@@ -250,19 +246,24 @@ export default function Halls() {
       showtime.movie || movieById.get(String(showtime.movieId || ""));
 
     const status = getShowtimeStatus(showtime, Number(movie?.duration), now);
-    if (status !== "UPCOMING" && status !== "NOW_SHOWING") continue;
 
     if (!showtimeStats[hallId]) {
-      showtimeStats[hallId] = { upcoming: 0, nowShowing: 0 };
+      showtimeStats[hallId] = { upcoming: 0, nowShowing: 0, ended: 0 };
     }
 
     if (status === "NOW_SHOWING") showtimeStats[hallId].nowShowing += 1;
-    else showtimeStats[hallId].upcoming += 1;
+    else if (status === "UPCOMING") showtimeStats[hallId].upcoming += 1;
+    else showtimeStats[hallId].ended += 1;
   }
 
   function currentShowtimeCount(hall) {
     const stats = showtimeStats[String(hall._id)];
     return stats ? stats.upcoming + stats.nowShowing : 0;
+  }
+
+  function totalShowtimeCount(hall) {
+    const stats = showtimeStats[String(hall._id)];
+    return stats ? stats.upcoming + stats.nowShowing + stats.ended : 0;
   }
 
   const totalCurrentShowtimes = halls.reduce(
@@ -526,6 +527,20 @@ export default function Halls() {
                     const stats = showtimeStats[String(hall._id)];
                     const currentCount = currentShowtimeCount(hall);
 
+                    // A hall with ANY showtime (including ended) can't be deleted.
+                    const totalCount = totalShowtimeCount(hall);
+                    const endedCount = stats?.ended ?? 0;
+                    const locked = totalCount > 0;
+                    const deleteReason = locked
+                      ? `This hall has ${totalCount} showtime${
+                          totalCount === 1 ? "" : "s"
+                        }${
+                          endedCount > 0
+                            ? ` (${endedCount} already ended)`
+                            : ""
+                        }, so it can't be deleted. Remove them first, or set the hall to Inactive.`
+                      : "Delete hall";
+
                     return (
                       <tr
                         key={hall._id}
@@ -579,6 +594,12 @@ export default function Halls() {
                           ) : (
                             <span>None</span>
                           )}
+
+                          {endedCount > 0 && (
+                            <div className="showtime-table-end">
+                              {endedCount} ended
+                            </div>
+                          )}
                         </td>
 
                         <td>
@@ -592,7 +613,10 @@ export default function Halls() {
 
                             <ActionButton
                               variant="delete"
+                              icon={locked ? "lock" : "trash"}
                               onClick={() => remove(hall)}
+                              disabled={locked}
+                              title={deleteReason}
                             >
                               Delete
                             </ActionButton>
