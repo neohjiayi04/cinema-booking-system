@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - fix/final-working-version
+      - feature/3d-seat-picker
   pull_request:
     branches:
       - main
