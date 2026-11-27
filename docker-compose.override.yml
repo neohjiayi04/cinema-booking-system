@@ -1,0 +1,11 @@
+services:
+  backend:
+    volumes:
+      - ./backend/src:/app/src
+      - /app/node_modules
+    command: ["npm", "run", "dev"]
+    
+#override 挂载 + 自动重启
+# Once change code in computer, container will auto restart and reflect the changes
+# no need always rebuild the image and restart the container
+#So for backend/src/ 的file, container auto use node --watch 重启&生效
