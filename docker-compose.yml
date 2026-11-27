@@ -4,7 +4,7 @@ services:
     container_name: cinema-mongodb-new
     restart: unless-stopped
     ports:
-      - "27019:27017"
+      - "127.0.0.1:27019:27017"   # DB reachable from this host only; backend uses the Docker network
     volumes:
       - mongo_data:/data/db
     healthcheck:
@@ -43,13 +43,11 @@ services:
     build: ./frontend
     container_name: cinema-frontend-new
     restart: unless-stopped
-    environment:
-      VITE_API_URL: http://localhost:3001/api
-      VITE_WS_URL: ws://localhost:3001
     ports:
       - "5174:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   mongo_data:
