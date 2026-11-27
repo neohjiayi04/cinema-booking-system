@@ -97,6 +97,32 @@ describe("BookingConfirmation Page", () => {
     ).toBeInTheDocument();
   });
 
+  it("should show the movie, date, time and hall when the booking includes them", async () => {
+    mockApi.mockResolvedValue({
+      ...sampleBooking,
+      movie: { title: "Space Voyage" },
+      showtime: { date: "2026-12-01", startTime: "19:30" },
+      hall: { name: "Hall 2" }
+    });
+
+    renderConfirmation();
+
+    expect(await screen.findByText("Space Voyage")).toBeInTheDocument();
+    expect(screen.getByText("2026-12-01 · 19:30 · Hall 2")).toBeInTheDocument();
+  });
+
+  it("should show an error and a way back when the booking cannot be loaded", async () => {
+    mockApi.mockRejectedValue(new Error("Booking not found"));
+
+    renderConfirmation();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Booking not found");
+    expect(screen.getByRole("link", { name: "View My Bookings" })).toHaveAttribute(
+      "href",
+      "/my-bookings"
+    );
+  });
+
   it("should display the selected seats", async () => {
     renderConfirmation();
 
@@ -132,6 +158,18 @@ describe("BookingConfirmation Page", () => {
       "src",
       expect.stringContaining(encodeURIComponent("CINEMA123"))
     );
+  });
+
+  it("should fall back to the booking reference text when the QR image cannot load", async () => {
+    renderConfirmation();
+
+    const qrCode = await screen.findByRole("img", { name: "Booking QR Code" });
+    fireEvent.error(qrCode);
+
+    expect(
+      await screen.findByText(/QR code unavailable/)
+    ).toBeInTheDocument();
+    expect(screen.getByText("CINEMA123")).toBeInTheDocument();
   });
 
   it("should provide a link to the My Bookings page", async () => {

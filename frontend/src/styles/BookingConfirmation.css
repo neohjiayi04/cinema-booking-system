@@ -1,274 +1,295 @@
-/* Colour tokens come from styles.css. Do not redeclare :root or body here. */
+/* Booking confirmation page. Colour tokens come from global.css. */
 
-/* Page Wrapper */
-.confirmation-wrapper {
+.confirm-page {
   display: flex;
-  align-items: center;
   justify-content: center;
-  padding: 24px;
+  align-items: center;
+  padding: 28px 24px 40px;
+  box-sizing: border-box;
 }
 
-.confirmation-container {
+.confirm-state {
+  align-self: center;
+  text-align: center;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.confirm-state a {
+  display: inline-block;
+  margin-top: 10px;
+}
+
+/* Open layout: subtle surface instead of a heavy boxed card */
+.confirm-card {
   width: 100%;
-  max-width: 960px;
-  background: var(--primary-white);
-  border-radius: 30px;
-  box-shadow: 0 20px 40px rgba(112, 126, 174, 0.08);
-  padding: 48px;
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 48px;
-  align-items: center;
-  position: relative;
+  max-width: 680px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(198, 221, 252, 0.8);
+  border-radius: 22px;
+  box-shadow: 0 10px 26px rgba(35, 45, 78, 0.06);
   overflow: hidden;
 }
 
-.loading-state {
+/* ---------- Header ---------- */
+.confirm-header {
+  padding: 24px 32px 20px;
+  text-align: center;
+  background: transparent;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.confirm-check {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 10px;
   display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  font-weight: 600;
-  color: var(--text-muted);
-  font-size: 1.1rem;
-}
-
-/* Left Content Styles */
-.success-badge {
-  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  background: linear-gradient(135deg, #4318ff 0%, #6ad2ff 100%);
-  border-radius: 16px;
-  margin-bottom: 20px;
-  box-shadow: 0 8px 20px rgba(67, 24, 255, 0.25);
-}
-
-.success-icon {
-  color: #ffffff;
-  font-size: 1.5rem;
-  font-weight: bold;
-}
-
-.eyebrow {
-  display: block;
-  font-size: 0.75rem;
-  letter-spacing: 2px;
-  color: var(--brand-blue);
-  font-weight: 800;
-  margin-bottom: 8px;
-}
-
-.confirmation-content h1 {
-  font-size: 2.5rem;
-  font-weight: 800;
-  margin: 0 0 16px 0;
-  color: var(--text-main);
-}
-
-.subtext {
-  color: var(--text-muted);
-  font-size: 1rem;
-  margin-bottom: 32px;
-  line-height: 1.6;
-}
-
-/* Interactive Reference Copy Button */
-.copy-ref-btn {
-  background: #f4f7fe;
-  border: 1px dashed var(--brand-blue);
-  color: var(--text-main);
-  padding: 4px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  position: relative;
-  font-family: inherit;
-  transition: all 0.2s ease;
-}
-
-.copy-ref-btn:hover {
-  background: #ebf0ff;
-}
-
-.copy-tooltip {
-  position: absolute;
-  top: -30px;
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
-  background: var(--text-main);
+  border-radius: 13px;
   color: #fff;
-  font-size: 0.7rem;
-  padding: 4px 8px;
-  border-radius: 4px;
-  opacity: 0;
-  pointer-events: none;
-  transition: all 0.2s ease;
-}
-
-.copy-tooltip.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-.action-group {
-  display: flex;
-  gap: 16px;
-}
-
-.primary-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--brand-blue);
-  color: #ffffff;
-  padding: 16px 32px;
-  border-radius: 16px;
-  text-decoration: none;
-  font-weight: 700;
-  font-size: 1rem;
-  box-shadow: 0 10px 20px rgba(67, 24, 255, 0.2);
-  transition: all 0.2s ease;
-}
-
-.primary-button:hover {
-  background-color: var(--brand-blue-hover);
-  transform: translateY(-2px);
-  box-shadow: 0 14px 24px rgba(67, 24, 255, 0.3);
-}
-
-/* Ticket Stub Design */
-.confirmation-card {
-  background: linear-gradient(145deg, #ffffff, #f9fbff);
-  border: 1px solid var(--border-color);
-  border-radius: 24px;
-  padding: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  position: relative;
-  box-shadow: 0 15px 35px rgba(112, 126, 174, 0.1);
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.confirmation-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 20px 40px rgba(67, 24, 255, 0.12);
-}
-
-.ticket-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 2px dashed var(--border-color);
-  padding-bottom: 14px;
-}
-
-.ticket-tag {
-  font-size: 0.75rem;
+  font-size: 1.25rem;
   font-weight: 800;
-  letter-spacing: 1px;
-  color: var(--text-muted);
-  text-transform: uppercase;
+  background: linear-gradient(135deg, #4318ff 0%, #6ad2ff 100%);
+  box-shadow: 0 6px 14px rgba(67, 24, 255, 0.2);
 }
 
-.live-pulse {
-  width: 8px;
-  height: 8px;
-  background-color: #05cd99;
-  border-radius: 50%;
-  animation: pulse 2s infinite;
+.confirm-eyebrow {
+  display: block;
+  font-size: 0.68rem;
+  letter-spacing: 1.6px;
+  font-weight: 800;
+  color: var(--brand-blue);
+  margin-bottom: 4px;
 }
 
-@keyframes pulse {
-  0% { box-shadow: 0 0 0 0 rgba(5, 205, 153, 0.4); }
-  70% { box-shadow: 0 0 0 8px rgba(5, 205, 153, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(5, 205, 153, 0); }
-}
-
-.ticket-body {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.ticket-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.ticket-row span {
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.ticket-row strong {
-  font-size: 1rem;
+.confirm-title {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.2;
+  font-weight: 800;
   color: var(--text-main);
-  font-weight: 700;
 }
 
-.price-highlight {
-  color: var(--brand-blue) !important;
+/* ---------- Movie ---------- */
+.confirm-movie {
+  padding: 16px 32px 0;
+  text-align: center;
 }
 
-.status-pill {
-  background-color: #e6fcf5;
-  color: #0ca678;
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
+.confirm-movie-title {
+  margin: 0 0 2px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-main);
 }
 
-/* QR Code Section Styling */
-.ticket-footer {
-  border-top: 2px dashed var(--border-color);
-  padding-top: 14px;
+.confirm-movie-meta {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+/* ---------- Body: QR + details ---------- */
+.confirm-body {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 28px;
+  align-items: center;
+  padding: 22px 32px;
+}
+
+.confirm-qr {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.confirm-qr-box {
+  background: #fff;
+  padding: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  box-shadow: none;
+}
+
+.confirm-qr-image,
+.confirm-qr-fallback {
+  display: block;
+  width: 132px;
+  height: 132px;
+}
+
+.confirm-qr-caption {
+  font-size: 0.6rem;
+  letter-spacing: 0.9px;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+.confirm-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 20px;
+  margin: 0;
+}
+
+.confirm-detail dd {
+  margin: 0;
+}
+
+.confirm-detail.is-wide {
+  grid-column: 1 / -1;
+}
+
+.confirm-label {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.confirm-value {
+  display: block;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  font-weight: 700;
+  color: var(--text-main);
+  overflow-wrap: anywhere;
+}
+
+.confirm-value.is-price {
+  font-size: 1.02rem;
+  color: var(--brand-blue);
+}
+
+.confirm-status {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  background: #e6fcf5;
+  color: #0ca678;
+}
+
+.confirm-status.is-cancelled {
+  background: #ffe0e0;
+  color: #ef4444;
+}
+
+/* Copy button */
+.confirm-ref {
+  display: inline-flex;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--text-main);
+  background: #f8faff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.qr-container {
-  background: #ffffff;
-  padding: 8px;
+.confirm-ref:hover {
+  background: #eef3ff;
+  border-color: var(--brand-blue);
+}
+
+.confirm-ref strong {
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.confirm-ref span {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--brand-blue);
+}
+
+/* ---------- Footer ---------- */
+.confirm-footer {
+  padding: 16px 32px 22px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: center;
+}
+
+.confirm-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 11px 26px;
   border-radius: 12px;
-  border: 1px solid var(--border-color);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--brand-blue);
+  box-shadow: 0 6px 14px rgba(67, 24, 255, 0.18);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.confirm-action:hover {
+  background: var(--brand-blue-hover);
+  transform: translateY(-1px);
+}
+
+.confirm-qr-fallback {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-}
-
-.ticket-qr-code {
-  width: 90px;
-  height: 90px;
-  display: block;
-}
-
-.scan-instruction {
+  padding: 8px;
+  box-sizing: border-box;
+  text-align: center;
   font-size: 0.7rem;
-  color: var(--text-muted);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
   font-weight: 600;
+  color: var(--text-muted);
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .confirmation-container {
-    grid-template-columns: 1fr;
-    padding: 24px;
-    gap: 32px;
+@media (max-width: 640px) {
+  .confirm-page {
+    align-items: flex-start;
+    padding: 16px 12px 32px;
   }
-  
-  .confirmation-content h1 {
-    font-size: 2rem;
+
+  .confirm-card {
+    border-radius: 18px;
+  }
+
+  .confirm-header,
+  .confirm-movie,
+  .confirm-body,
+  .confirm-footer {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .confirm-title {
+    font-size: 1.5rem;
+  }
+
+  .confirm-body {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 18px;
+    padding-top: 18px;
+    padding-bottom: 18px;
+  }
+
+  .confirm-details {
+    width: 100%;
+    gap: 12px 16px;
   }
 }
