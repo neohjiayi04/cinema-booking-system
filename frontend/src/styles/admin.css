@@ -793,24 +793,26 @@ body:has(.admin-layout) {
 /* ---------------------------------------------------------
    8. TABLES — MOVIES, BOOKINGS, USERS, SHOWTIMES (LIGHT & ELEGANT)
    --------------------------------------------------------- */
+/* 随页面自然展开，仅在超出宽度时横向滚动 */
 .admin-table-wrapper {
   position: relative;
   width: 100%;
-  max-height: 720px;
-  overflow: auto;
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: visible;
   overscroll-behavior-x: contain;
   border: 1px solid var(--admin-border);
   border-radius: 16px;
   background: var(--admin-surface);
   box-shadow: var(--admin-shadow-card);
 }
- 
+
 .admin-panel .admin-table-wrapper {
   border: 0;
   border-radius: 0;
   box-shadow: none;
 }
- 
+
 .admin-table {
   width: 100%;
   border-collapse: separate;
@@ -819,7 +821,7 @@ body:has(.admin-layout) {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
- 
+
 /* Header */
 .admin-table th {
   position: sticky;
@@ -834,21 +836,21 @@ body:has(.admin-layout) {
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
- 
+
 /* Cells */
 .admin-table td {
-  padding: 16px 20px;
+  padding: 16px 14px;
   border-bottom: 1px solid var(--admin-border);
   color: var(--admin-text-secondary);
   font-size: 12px;
   vertical-align: middle;
 }
- 
+
 .admin-table th:first-child,
 .admin-table td:first-child {
   padding-left: 28px;
 }
- 
+
 /* Last column (totals, actions) sits on the right edge */
 .admin-table th:last-child,
 .admin-table td:last-child {
@@ -866,53 +868,53 @@ body:has(.admin-layout) {
 .admin-table td:last-child .app-act-group:not(.app-act-group--stack) {
   justify-content: flex-start;
 }
- 
+
 .admin-table tbody tr:last-child td {
   border-bottom: 0;
 }
- 
-/* Row hover: soft tint + indigo marker on the left edge */
+
+/* Row hover & editing state */
 .admin-table tbody tr {
   transition: background var(--admin-transition);
 }
- 
-.admin-table tbody tr:hover {
+
+.admin-table tbody tr:hover,
+.admin-table tbody tr.is-editing {
   background: var(--admin-accent-soft);
 }
- 
+
 .admin-table tbody tr:hover td:first-child,
 .admin-table tbody tr.is-editing td:first-child {
   box-shadow: inset 3px 0 0 var(--admin-accent);
 }
- 
-/* Row currently being edited */
-.admin-table tbody tr.is-editing {
-  background: var(--admin-accent-soft);
-}
- 
+
 /* Text helpers */
 .admin-table strong {
   color: var(--admin-text);
   font-weight: 600;
 }
- 
+
 .admin-table .admin-cell-primary {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--admin-text);
   font-weight: 600;
 }
- 
+
 .admin-table .admin-cell-muted {
   color: var(--admin-text-muted);
   font-size: 12px;
 }
- 
+
 /* Movie cell with poster */
 .admin-movie-cell {
   display: flex;
   align-items: center;
   gap: 14px;
 }
- 
+
 .admin-table-poster {
   flex-shrink: 0;
   width: 42px;
@@ -924,18 +926,18 @@ body:has(.admin-layout) {
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
   transition: transform var(--admin-transition);
 }
- 
+
 .admin-table tbody tr:hover .admin-table-poster {
   transform: scale(1.05);
 }
- 
+
 /* Row actions */
 .admin-table-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
- 
+
 /* Footer under a table */
 .admin-table-footer {
   display: flex;
@@ -950,7 +952,7 @@ body:has(.admin-layout) {
   font-weight: 500;
 }
 
-/* Table row buttons: same look as the Movies page */
+/* Table row buttons */
 .admin-table-actions .admin-btn-sm {
   min-height: 36px;
   padding: 0 16px;
@@ -982,27 +984,27 @@ body:has(.admin-layout) {
 }
 
 .admin-table-actions .admin-btn-danger:hover:not(:disabled) {
-  background:  #f96e6e;
+  background: #f96e6e;
   color: #fff;
 }
- 
+
 /* Phones */
 @media (max-width: 768px) {
   .admin-table th,
   .admin-table td {
     padding: 12px 14px;
   }
- 
+
   .admin-table th:first-child,
   .admin-table td:first-child {
     padding-left: 18px;
   }
- 
+
   .admin-table th:last-child,
   .admin-table td:last-child {
     padding-right: 18px;
   }
- 
+
   .admin-table-footer {
     padding: 14px 18px;
   }
@@ -3313,8 +3315,9 @@ body:has(.admin-layout) {
 .admin-filter-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 24px 16px;
+  gap: 10px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--admin-border);
 }
 
 .admin-filter-tab {
