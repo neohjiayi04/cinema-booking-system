@@ -121,7 +121,7 @@ export default function Navbar() {
 
         {!user && (
           <>
-            <NavLink to="/login" className={linkClass}>
+            <NavLink to="/login" className="navbar-cta">
               Log In
             </NavLink>
             <Link to="/register" className="navbar-cta">
