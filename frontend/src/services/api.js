@@ -17,6 +17,23 @@ export async function api(path, options = {}) {
 
   const data = await response.json().catch(() => ({}));
 
+  // The saved token was rejected (expired after 2 hours, or the server's secret
+  // changed). Drop it and send the user to the login page instead of leaving every
+  // page failing with "Invalid or expired token". Wrong-password logins are not
+  // session expiry, so the auth endpoints are excluded.
+  if (response.status === 401 && token && !path.startsWith("/auth/login") && !path.startsWith("/auth/register")) {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    if (window.location.pathname !== "/login") {
+      window.location.assign("/login");
+    }
+
+    const expired = new Error("Your session has expired. Please log in again.");
+    expired.status = 401;
+    throw expired;
+  }
+
   if (!response.ok) {
     // Show only the readable server message in the pop-up
     // (no "409 Conflict:" prefix). The status stays available on the error.
