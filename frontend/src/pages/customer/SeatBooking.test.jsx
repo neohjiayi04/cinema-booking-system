@@ -180,7 +180,11 @@ describe("SeatBooking Page", () => {
 
     expect(mockConnectShowtime).toHaveBeenCalledWith(
       "showtime-123",
-      expect.any(Function)
+      expect.any(Function),
+      expect.objectContaining({
+        onDisconnect: expect.any(Function),
+        onReconnect: expect.any(Function),
+      })
     );
   });
 
