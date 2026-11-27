@@ -11,8 +11,8 @@ describe("api()", () => {
     const mockResponse = {
       message: "Success"
     };
-
-    global.fetch = vi.fn().mockResolvedValue({
+    //global is a Node-only name, so change global to globalThis to make it work in both Node and browser environments
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue(mockResponse)
     });
@@ -34,7 +34,7 @@ describe("api()", () => {
   it("adds the Authorization header when a token exists", async () => {
     localStorage.setItem("token", "test-token");
 
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue({
         success: true
@@ -55,7 +55,7 @@ describe("api()", () => {
   });
 
   it("does not add Authorization when no token exists", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue({
         success: true
@@ -75,7 +75,7 @@ describe("api()", () => {
   });
 
   it("passes request options to fetch", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue({
         success: true
@@ -109,7 +109,7 @@ describe("api()", () => {
       bookings: []
     };
 
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue(responseData)
     });
@@ -120,7 +120,7 @@ describe("api()", () => {
   });
 
   it("throws an error using the server message when the request fails", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 409,
       json: vi.fn().mockResolvedValue({
@@ -135,7 +135,7 @@ describe("api()", () => {
   });
 
   it("uses the status code when the server provides no message", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 500,
       json: vi.fn().mockResolvedValue({})
@@ -148,7 +148,7 @@ describe("api()", () => {
   });
 
   it("handles a response with invalid JSON", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 500,
       json: vi.fn().mockRejectedValue(new Error("Invalid JSON"))
@@ -161,7 +161,7 @@ describe("api()", () => {
   });
 
   it("preserves custom headers from options", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: vi.fn().mockResolvedValue({
         success: true

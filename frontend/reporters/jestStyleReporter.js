@@ -13,6 +13,7 @@
 // onFinished API (Vitest 1/2), so it keeps working if you change versions.
 
 import path from "node:path";
+import process from "node:process";
 
 const useColor = process.stdout.isTTY || process.env.FORCE_COLOR;
 const c = (code, text) => (useColor ? `\x1b[${code}m${text}\x1b[0m` : String(text));
@@ -31,7 +32,9 @@ const TICK = isWindows ? "√" : "✓";
 const CROSS = isWindows ? "×" : "✕";
 const SKIP = "○";
 
-const stripAnsi = (text) => String(text ?? "").replace(/\x1b\[[0-9;]*m/g, "");
+// Built from the ESC character so the pattern has no literal control characters
+const ANSI_PATTERN = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+const stripAnsi = (text) => String(text ?? "").replace(ANSI_PATTERN, "");
 const toPosix = (p) => String(p).replace(/\\/g, "/");
 const pad = (depth) => "  ".repeat(depth);
 const fmtMs = (ms) => `${Math.round(Number(ms) || 0)} ms`;
