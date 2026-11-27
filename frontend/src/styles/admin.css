@@ -853,11 +853,18 @@ body:has(.admin-layout) {
 .admin-table th:last-child,
 .admin-table td:last-child {
   padding-right: 28px;
-  text-align: right;
+  text-align: left;
 }
- 
-.admin-table td:last-child .admin-table-actions {
-  justify-content: flex-end;
+
+/* Actions column hugs its buttons, so no empty space is left on the right */
+.admin-table td:last-child:has(.admin-table-actions),
+.admin-table td:last-child:has(.app-act-group:not(.app-act-group--stack)) {
+  width: 1%;
+}
+
+.admin-table td:last-child .admin-table-actions,
+.admin-table td:last-child .app-act-group:not(.app-act-group--stack) {
+  justify-content: flex-start;
 }
  
 .admin-table tbody tr:last-child td {
@@ -1008,50 +1015,37 @@ body:has(.admin-layout) {
   align-items: center;
   gap: 6px;
   width: fit-content;
-  padding: 5px 9px;
+  padding: 5px 10px;
   border: 1px solid transparent;
   border-radius: 999px;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 800;
   line-height: 1.3;
   white-space: nowrap;
-}
-
-.admin-status::before {
-  flex-shrink: 0;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-  content: "";
+  text-transform: uppercase;
 }
 
 .admin-status-success {
-  border-color: rgba(24, 122, 82, 0.22);
   background: var(--admin-success-bg);
   color: var(--admin-success);
 }
 
 .admin-status-warning {
-  border-color: rgba(168, 106, 12, 0.24);
   background: var(--admin-warning-bg);
   color: var(--admin-warning);
 }
 
 .admin-status-danger {
-  border-color: rgba(191, 47, 74, 0.22);
   background: var(--admin-danger-bg);
   color: var(--admin-danger);
 }
 
 .admin-status-info {
-  border-color: rgba(31, 95, 166, 0.22);
   background: var(--admin-info-bg);
   color: var(--admin-info);
 }
 
 .admin-status-neutral {
-  border-color: var(--admin-border);
   background: var(--admin-surface-raised);
   color: var(--admin-text-secondary);
 }

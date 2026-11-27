@@ -8,12 +8,17 @@
     "build": "vite build",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:unit": "vitest run src/components/SeatMap.unit.test.jsx src/components/SeatPicker/seatMath.unit.test.js src/services/api.unit.test.js",
+    "test:verbose": "vitest run --reporter=verbose",
+    "test:jest-style": "vitest run --reporter=./src/test/reporters/jestStyleReporter.js"
   },
   "dependencies": {
+    "@react-three/fiber": "^9.8.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-router-dom": "^7.9.4"
+    "react-router-dom": "^7.9.4",
+    "three": "^0.187.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

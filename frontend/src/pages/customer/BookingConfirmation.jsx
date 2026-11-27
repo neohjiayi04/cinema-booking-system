@@ -1,92 +1,130 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../../services/api.js";
-import "../../styles/BookingConfirmation.css";
+import "../../styles/MyBookings.css";
 
 export default function BookingConfirmation() {
   const { id } = useParams();
+
   const [booking, setBooking] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const resetTimer = useRef(null);
 
   useEffect(() => {
-    api(`/bookings/${id}`).then(setBooking);
+    let cancelled = false;
+
+    api(`/bookings/${id}`)
+      .then((data) => {
+        if (!cancelled) setBooking(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err.message || "Unable to load your booking.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(resetTimer.current);
+    };
   }, [id]);
 
-  const handleCopy = () => {
-    if (booking?.bookingReference) {
-      navigator.clipboard.writeText(booking.bookingReference);
+  async function copyReference() {
+    if (!booking?.bookingReference) return;
+
+    try {
+      await navigator.clipboard.writeText(booking.bookingReference);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+
+      clearTimeout(resetTimer.current);
+      resetTimer.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
     }
-  };
+  }
 
-  if (!booking) return <div className="loading-state">Loading your ticket...</div>;
+  if (loading) {
+    return <div className="bookings-page-wrapper">Loading your ticket...</div>;
+  }
 
-  // Generate a dynamic QR code URL using the booking reference
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
+  if (error || !booking) {
+    return (
+      <div className="bookings-page-wrapper">
+        <p role="alert">{error || "Booking not found."}</p>
+        <Link to="/my-bookings">View My Bookings</Link>
+      </div>
+    );
+  }
+
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
     booking.bookingReference
   )}`;
 
+  const amount = Number(booking.totalAmount);
+
   return (
-    <section className="confirmation-wrapper">
-      <div className="confirmation-container">
-        
-        {/* Left Section: Details & CTA */}
-        <div className="confirmation-content">
-          <div className="success-badge">
-            <span className="success-icon">✓</span>
-          </div>
-          <span className="eyebrow">BOOKING CONFIRMED</span>
-          <h1>You are all set!</h1>
-          <p className="subtext">
-            Your booking reference is{" "}
-            <button className="copy-ref-btn" onClick={handleCopy} title="Click to copy">
-              <strong>{booking.bookingReference}</strong>
-              <span className={`copy-tooltip ${copied ? "show" : ""}`}>
-                {copied ? "Copied!" : "Copy"}
-              </span>
-            </button>
+    <div className="bookings-page-wrapper">
+      <section className="bookings-page-container">
+        <span className="eyebrow">BOOKING CONFIRMED</span>
+        <h1>You are all set!</h1>
+
+        {booking.movie?.title && (
+          <h2 className="movie-title">{booking.movie.title}</h2>
+        )}
+
+        {booking.showtime?.date && (
+          <p className="movie-meta">
+            {booking.showtime.date}
+            {booking.showtime.startTime ? ` · ${booking.showtime.startTime}` : ""}
+            {booking.hall?.name ? ` · ${booking.hall.name}` : ""}
           </p>
+        )}
 
-          <div className="action-group">
-            <Link className="primary-button" to="/my-bookings">
-              View My Bookings
-            </Link>
+        <div className="qr-box">
+          <img src={qrUrl} alt="Booking QR Code" className="qr-image" />
+        </div>
+
+        <div className="ticket-info-grid">
+          <div>
+            <span className="info-label">Booking reference</span>
+            <button
+              type="button"
+              className="ref-number"
+              title="Click to copy"
+              onClick={copyReference}
+            >
+              <strong>{booking.bookingReference}</strong>
+              <span>{copied ? "Copied!" : "Copy"}</span>
+            </button>
+          </div>
+
+          <div>
+            <span className="info-label">Seats</span>
+            <strong className="info-val">{(booking.seats || []).join(", ")}</strong>
+          </div>
+
+          <div>
+            <span className="info-label">Total</span>
+            <strong className="info-val price">
+              {Number.isFinite(amount) ? `RM ${amount.toFixed(2)}` : "RM —"}
+            </strong>
+          </div>
+
+          <div>
+            <span className="info-label">Status</span>
+            <strong className="info-val">{booking.status}</strong>
           </div>
         </div>
 
-        {/* Right Section: Ticket Stub Card with QR Code */}
-        <div className="confirmation-card">
-          <div className="ticket-header">
-            <span className="ticket-tag">E-Ticket Summary</span>
-            <span className="live-pulse"></span>
-          </div>
-
-          <div className="ticket-body">
-            <div className="ticket-row">
-              <span>Seats</span>
-              <strong>{booking.seats.join(", ")}</strong>
-            </div>
-            <div className="ticket-row">
-              <span>Total Amount</span>
-              <strong className="price-highlight">RM {booking.totalAmount.toFixed(2)}</strong>
-            </div>
-            <div className="ticket-row">
-              <span>Status</span>
-              <span className="status-pill">{booking.status}</span>
-            </div>
-          </div>
-
-          {/* QR Code Footer Section */}
-          <div className="ticket-footer">
-            <div className="qr-container">
-              <img src={qrCodeUrl} alt="Booking QR Code" className="ticket-qr-code" />
-            </div>
-            <span className="scan-instruction">Scan to check-in</span>
-          </div>
-        </div>
-
-      </div>
-    </section>
+        <Link to="/my-bookings" className="btn-modify">
+          View My Bookings
+        </Link>
+      </section>
+    </div>
   );
 }

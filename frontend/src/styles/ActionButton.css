@@ -1,0 +1,161 @@
+/* =========================================================
+   SHARED ACTION BUTTONS (icon + text)
+   Moved from section 9 of AdminMovies.css so Movies, Halls,
+   Showtimes and My Bookings all look and align the same.
+
+   Edit = indigo, View = blue, Archive = amber, Restore/Save = green,
+   Delete = red, Neutral = grey outline.
+   Disabled = grey, hatched, dashed "locked" button.
+   Uses --admin-* tokens when present, with light fallbacks.
+   ========================================================= */
+
+/* A row of buttons: same height, same gap, never wraps in a table cell */
+.app-act-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Vertical, full-width stack (ticket cards, narrow side panels) */
+.app-act-group--stack {
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+}
+
+.app-act-group--stack .app-act,
+.app-act-group--stack .app-act-wrap {
+  display: flex;
+  width: 100%;
+}
+
+.app-act-wrap {
+  display: inline-flex;
+}
+
+.app-act {
+  --act-amber: #b45309;
+  --act-amber-bg: #fff7ed;
+  --act-lock-bg: #f1f0f6;
+  --act-lock-line: #cfcce0;
+  --act-lock-text: #8b89a3;
+
+  display: inline-flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 96px;       /* equal widths so buttons line up row after row */
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--admin-border-strong, #d9d8e6);
+  border-radius: 10px;
+  background: var(--admin-surface, #ffffff);
+  color: var(--admin-text-secondary, #5b5a78);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all var(--admin-transition, 160ms ease);
+}
+
+.app-act-icon {
+  flex-shrink: 0;
+}
+
+/* Edit / Modify */
+.app-act--edit {
+  border-color: var(--admin-accent-line, rgba(91, 91, 240, 0.35));
+  background: var(--admin-accent-soft, rgba(91, 91, 240, 0.1));
+  color: var(--admin-accent-text, #4338ca);
+}
+
+.app-act--edit:hover:not(:disabled) {
+  background: var(--admin-accent, #5b5bf0);
+  color: #fff;
+}
+
+/* View (read-only details) */
+.app-act--view {
+  border-color: rgba(31, 95, 166, 0.3);
+  background: var(--admin-info-bg, #eaf2fb);
+  color: var(--admin-info, #1f5fa6);
+}
+
+.app-act--view:hover:not(:disabled) {
+  border-color: var(--admin-info, #1f5fa6);
+  background: var(--admin-info, #1f5fa6);
+  color: #fff;
+}
+
+/* Archive */
+.app-act--archive {
+  border-color: rgba(217, 119, 6, 0.38);
+  background: var(--act-amber-bg);
+  color: var(--act-amber);
+}
+
+.app-act--archive:hover:not(:disabled) {
+  border-color: #f59e0b;
+  background: #f59e0b;
+  color: #fff;
+}
+
+/* Restore / Save */
+.app-act--restore,
+.app-act--save {
+  border-color: rgba(24, 122, 82, 0.35);
+  background: var(--admin-success-bg, #e8f6ef);
+  color: var(--admin-success, #187a52);
+}
+
+.app-act--restore:hover:not(:disabled),
+.app-act--save:hover:not(:disabled) {
+  border-color: var(--admin-success, #187a52);
+  background: var(--admin-success, #187a52);
+  color: #fff;
+}
+
+/* Delete / Cancel */
+.app-act--delete {
+  border-color: rgba(220, 38, 38, 0.4);
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.app-act--delete:hover:not(:disabled) {
+  border-color: #ef4444;
+  background: #ef4444;
+  color: #fff;
+}
+
+/* Neutral (e.g. Cancel editing) */
+.app-act--neutral:hover:not(:disabled) {
+  border-color: var(--admin-accent-line, rgba(91, 91, 240, 0.35));
+  background: var(--admin-surface-raised, #f4f3fa);
+  color: var(--admin-text, #17162b);
+}
+
+/* Locked / disabled: same look for every variant */
+.app-act:disabled {
+  border: 1px dashed var(--act-lock-line);
+  background:
+    repeating-linear-gradient(135deg, transparent 0 6px, rgba(124, 122, 149, 0.09) 6px 12px),
+    var(--act-lock-bg);
+  color: var(--act-lock-text);
+  box-shadow: none;
+  cursor: not-allowed;
+  transform: none;
+  pointer-events: none; /* hover goes to the wrapper so its tooltip shows */
+}
+
+.app-act-wrap:has(.app-act:disabled) {
+  cursor: not-allowed;
+}
+
+.app-act:focus-visible {
+  outline: 2px solid var(--admin-accent-text, #4338ca);
+  outline-offset: 3px;
+}

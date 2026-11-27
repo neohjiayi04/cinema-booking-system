@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../services/api.js";
+import PopupHost, { useConfirm } from "../../components/Popup.jsx";
 import "../../styles/MyBookings.css";
 
 function getBookingCategory(booking) {
@@ -33,7 +34,12 @@ export default function MyBookings() {
   const [editingBooking, setEditingBooking] = useState(null);
   const [newSeats, setNewSeats] = useState("");
   const [activeTab, setActiveTab] = useState("upcoming");
-  
+
+  // Centered pop-up messages (same pattern as the admin Halls page)
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [askConfirm, confirmDialog] = useConfirm();
+
   const fetchBookings = async () => {
     const data = await api("/bookings/my");
     setBookings(data);
@@ -52,6 +58,9 @@ export default function MyBookings() {
         }
       } catch (err) {
         console.error("Failed to load bookings:", err);
+        if (!cancelled) {
+          setError(err.message || "Unable to load your bookings. Please refresh the page.");
+        }
       }
     }
 
@@ -83,22 +92,37 @@ export default function MyBookings() {
 
   // DELETE operation
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to cancel this booking?")) {
-      try {
-        await api(`/bookings/${id}`, { method: "DELETE" });
+    const ok = await askConfirm({
+      title: "Cancel this booking?",
+      message: "Your seats will be released and this pass will no longer be valid.",
+      confirmText: "Cancel booking",
+      cancelText: "Keep booking",
+      tone: "danger",
+      icon: "alert",
+    });
 
-        setBookings((prev) =>
-          prev.map((b) =>
-            b._id === id
-              ? { ...b, status: "CANCELLED" }
-              : b
-          )
-        );
+    if (!ok) {
+      return;
+    }
 
-        setEditingBooking(null);
-      } catch (err) {
-        alert(err.message || "Failed to cancel booking.");
-      }
+    setError("");
+    setMessage("");
+
+    try {
+      await api(`/bookings/${id}`, { method: "DELETE" });
+
+      setBookings((prev) =>
+        prev.map((b) =>
+          b._id === id
+            ? { ...b, status: "CANCELLED" }
+            : b
+        )
+      );
+
+      setEditingBooking(null);
+      setMessage("Your booking has been cancelled.");
+    } catch (err) {
+      setError(err.message || "Failed to cancel booking.");
     }
   };
 
@@ -109,32 +133,44 @@ export default function MyBookings() {
   };
 
   const handleUpdateSubmit = async (id) => {
+    setError("");
+    setMessage("");
+
     try {
-      const updatedSeatArray =newSeats
-      .split(",")
-      .map((s) => s.trim().toUpperCase())
-      .filter(Boolean);
+      const updatedSeatArray = newSeats
+        .split(",")
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean);
 
       await api(`/bookings/${id}`, {
         method: "PUT",
-        body: JSON.stringify({seats:updatedSeatArray}),
+        body: JSON.stringify({ seats: updatedSeatArray }),
       });
-      
-      //FEtch fully populated bookings after update
+
+      // Fetch fully populated bookings after update
       await fetchBookings();
 
       setEditingBooking(null);
       setNewSeats("");
-    }
-    catch (err) {
-      alert(err.message || "Failed to update booking.");
+      setMessage("Your seats have been updated.");
+    } catch (err) {
+      setError(err.message || "Failed to update booking.");
     }
   };
 
   return (
     <div className="bookings-page-wrapper">
+      {/* Centered pop-up messages */}
+      <PopupHost
+        error={error}
+        notice={message}
+        onCloseError={() => setError("")}
+        onCloseNotice={() => setMessage("")}
+      />
+      {confirmDialog}
+
       <section className="bookings-page-container">
-        
+
         {/* Page Title Header */}
         <div className="bookings-header">
           <div>
@@ -181,7 +217,7 @@ export default function MyBookings() {
 
             return (
               <article className="ticket-card" key={b._id}>
-                
+
                 {/* 1. Poster Thumbnail */}
                 <div className="ticket-poster-container">
                   <img

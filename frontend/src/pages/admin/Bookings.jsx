@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../services/api.js";
+import ActionButton from "../../components/ActionButton.jsx";
 import "../../styles/AdminBookings.css";
 
 function formatDate(date) {
@@ -350,13 +351,14 @@ export default function Bookings() {
                       </td>
 
                       <td>
-                        <button
-                          type="button"
-                          className="booking-view-button"
-                          onClick={() => setSelectedBooking(booking)}
-                        >
-                          View
-                        </button>
+                        <div className="app-act-group">
+                          <ActionButton
+                            variant="view"
+                            onClick={() => setSelectedBooking(booking)}
+                          >
+                            View
+                          </ActionButton>
+                        </div>
                       </td>
                     </tr>
                   );

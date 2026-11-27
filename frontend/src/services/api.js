@@ -18,11 +18,13 @@ export async function api(path, options = {}) {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    throw new Error(
-      `${response.status} ${response.statusText}: ${
-        data.message || "Request failed"
-      }`
+    // Show only the readable server message in the pop-up
+    // (no "409 Conflict:" prefix). The status stays available on the error.
+    const error = new Error(
+      data.message || `Request failed (${response.status})`
     );
+    error.status = response.status;
+    throw error;
   }
 
   return data;

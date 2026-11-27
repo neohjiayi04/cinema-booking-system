@@ -1,0 +1,180 @@
+/* Homepage hero: the featured movie's title is the headline, its poster is the backdrop.
+   Self-contained (.hf-* classes), so it does not depend on the old .hero rules in Home.css;
+   you can delete those once you are happy with this. */
+.hf {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin: 0 0 3rem;
+  padding: clamp(2rem, 2vw, 3rem);
+  border-radius: 28px;
+  background: #0b1020; /* shown while the poster loads, or when a movie has none */
+  color: #fff;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+}
+
+/* Blurred poster fills the whole card, then a dark gradient keeps the text readable */
+.hf::before {
+  position: absolute;
+  inset: -40px;
+  z-index: -2;
+  background: var(--hf-poster, linear-gradient(135deg, #1e3a8a, #4f46e5 55%, #0b1020)) center / cover no-repeat;
+  filter: blur(30px) saturate(1.25);
+  transform: scale(1.1);
+  content: "";
+}
+
+.hf::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(900px 420px at 85% 10%, rgba(99, 102, 241, 0.35), transparent 60%),
+    linear-gradient(100deg, rgba(8, 12, 28, 0.93) 22%, rgba(8, 12, 28, 0.62) 62%, rgba(8, 12, 28, 0.35));
+  content: "";
+}
+
+.hf-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(200px, 0.7fr);
+  align-items: center;
+  gap: clamp(1rem, vw, 2rem);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.hf-copy { min-width: 0; animation: hf-rise 600ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+.hf-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.hf-eyebrow i { color: #fbbf24; font-style: normal; }
+
+.hf-title {
+  margin: 1.1rem 0 0;
+  color: #fff;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.4rem, 5.4vw, 4.4rem);
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  text-shadow: 0 4px 30px rgba(0, 0, 0, 0.45);
+  overflow-wrap: anywhere;
+}
+
+.hf-title em { color: #93c5fd; font-style: italic; }
+
+.hf-meta { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1.1rem; }
+
+.hf-meta span {
+  padding: 0.3rem 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.hf-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  max-width: 56ch;
+  margin: 1.2rem 0 0;
+  overflow: hidden;
+  color: #cbd5e1;
+  font-size: 1.02rem;
+  line-height: 1.7;
+}
+
+.hf-actions { display: flex; flex-wrap: wrap; gap: 0.85rem; margin-top: 1.8rem; }
+
+.hf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50px;
+  padding: 0 1.7rem;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: pre;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.hf-btn-primary {
+  background: linear-gradient(135deg, #3b82f6, #6366f1);
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(79, 70, 229, 0.45);
+}
+
+.hf-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(79, 70, 229, 0.6); }
+
+.hf-btn-ghost {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.hf-btn-ghost:hover { background: rgba(255, 255, 255, 0.18); }
+
+.hf-btn:focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
+
+/* Poster card, slightly tilted with a glow; straightens on hover */
+.hf-poster-wrap { display: flex; justify-content: center; animation: hf-rise 700ms 120ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+.hf-poster {
+  width: min(100%, 320px);
+  aspect-ratio: 2 / 3;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 20px;
+  background: linear-gradient(160deg, #1e3a8a, #312e81);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.55), 0 0 60px rgba(99, 102, 241, 0.35);
+  transform: rotate(2.5deg);
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+
+.hf-poster:hover { transform: rotate(0deg) scale(1.03); box-shadow: 0 36px 80px rgba(0, 0, 0, 0.6), 0 0 80px rgba(99, 102, 241, 0.5); }
+.hf-poster img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+.hf-poster-fallback { display: grid; place-content: center; gap: 0.5rem; height: 100%; padding: 1.5rem; text-align: center; }
+.hf-poster-fallback span { color: #93c5fd; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.18em; }
+.hf-poster-fallback strong { font-family: Georgia, serif; font-size: 1.3rem; }
+
+@keyframes hf-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 860px) {
+  .hf { border-radius: 22px; }
+  .hf-inner { grid-template-columns: minmax(0, 1fr); }
+  .hf-poster-wrap { order: -1; }
+  .hf-poster { width: min(55%, 220px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hf-copy, .hf-poster-wrap { animation: none; }
+  .hf-poster, .hf-btn { transition: none; }
+}

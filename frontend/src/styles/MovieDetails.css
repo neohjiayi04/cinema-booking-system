@@ -143,7 +143,7 @@
   border: 1px solid #e2e8f0;
   border-radius: 16px;
   background: #ffffff;
-  color: #0f172a;
+  color: #0c1427;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   font: inherit;
@@ -297,7 +297,7 @@
   padding: 2rem 1rem;
   border-radius: 12px;
   background: #f8fafc;
-  color: #64748b;
+  color: #58667a;
   text-align: center;
   font-size: 0.88rem;
 }

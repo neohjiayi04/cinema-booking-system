@@ -19,7 +19,7 @@ export function validateSeats(seats, rows, seatsPerRow) {
 
   const validSeats = generateValidSeats(rows, seatsPerRow);
 
-  return seats.every(seat => validSeats.has(seat));
+  return seats.every((seat) => validSeats.has(seat));
 }
 
 export function calculateBookingTotal(numberOfSeats, pricePerSeat) {

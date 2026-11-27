@@ -4,38 +4,9 @@ import http from "http";
 import { WebSocketServer } from "ws";
 import { ObjectId } from "mongodb";
 import { getDb } from "./db.js";
-import {
-  hashPassword,
-  verifyPassword,
-  createToken,
-  requireAuth,
-  requireAdmin
-} from "./auth.js";
-import {
-  MOVIE_STATUS,
-  decorateMovie,
-  getMovieStatus,
-  bookingBlockedMessage,
-  normalizeTitle,
-  releaseYear,
-  validateMovie,
-  pickMovieFields,
-  showtimeDateProblem,
-  todayString
-} from "./utils/movieUtils.js";
-import {
-  HALL_STATUS,
-  decorateHall,
-  hallStatus,
-  isValidTime,
-  isValidDate,
-  isShowtimePast,
-  isShowtimeUpcoming,
-  findShowtimeConflict,
-  conflictMessage,
-  pickHallFields,
-  validateHall
-} from "./utils/showtimeUtils.js";
+import {  hashPassword, verifyPassword, createToken, requireAuth, requireAdmin} from "./auth.js";
+import {MOVIE_STATUS, decorateMovie, getMovieStatus, bookingBlockedMessage,normalizeTitle,releaseYear,validateMovie,pickMovieFields,showtimeDateProblem,todayString} from "./utils/movieUtils.js";
+import {HALL_STATUS,decorateHall,hallStatus,isValidTime,isValidDate,isShowtimePast,isShowtimeUpcoming,findShowtimeConflict,conflictMessage,pickHallFields,validateHall} from "./utils/showtimeUtils.js";
 import { generateValidSeats } from "./utils/seatUtils.js";
 
 const app = express();
@@ -664,7 +635,33 @@ app.get("/api/showtimes", async (req, res) => {
         from: "halls", localField: "hallId", foreignField: "_id", as: "hall"
       }
     },
-    { $unwind: "$hall" }
+    { $unwind: "$hall" },
+    {
+      $lookup: {
+        from: "bookings",
+        let: { showtimeId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$showtimeId", "$$showtimeId"] },
+              status: "CONFIRMED" // remove this line if you want every booking status counted
+            }
+          },
+          { $count: "count" }
+        ],
+        as: "bookingStats"
+      }
+    },
+    {
+      $addFields: {
+        bookingCount: { $ifNull: [{ $arrayElemAt: ["$bookingStats.count", 0] }, 0] }
+      }
+    },
+    {
+      $project: {
+        bookingStats: 0
+      }
+    }
   ]).toArray();
 
   const today = todayString();

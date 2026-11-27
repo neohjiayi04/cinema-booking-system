@@ -2,13 +2,33 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import MyBookings from "./MyBookings.jsx";
 
-const { mockApi } = vi.hoisted(() => ({
-  mockApi: vi.fn()
+const { mockApi, mockConfirm } = vi.hoisted(() => ({
+  mockApi: vi.fn(),
+  mockConfirm: vi.fn()
 }));
 
 vi.mock("../../services/api.js", () => ({
   api: mockApi
 }));
+
+// The page reports errors / notices through PopupHost and asks for confirmation
+// through useConfirm() (it no longer uses window.alert / window.confirm).
+// Replace both with deterministic versions so these tests do not depend on how
+// the real popup is styled or animated.
+vi.mock("../../components/Popup.jsx", async () => {
+  const { createElement: h, Fragment } = await import("react");
+
+  return {
+    default: ({ error, notice }) =>
+      h(
+        Fragment,
+        null,
+        error ? h("div", { role: "alert" }, error) : null,
+        notice ? h("div", { role: "status" }, notice) : null
+      ),
+    useConfirm: () => [mockConfirm, null]
+  };
+});
 
 // The page treats a booking as Completed once its showtime has ended, so the fixture
 // date is generated relative to today. A fixed date would eventually fall in the past
@@ -41,6 +61,8 @@ describe("MyBookings Page", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockApi.mockResolvedValue([sampleBooking]);
+        mockConfirm.mockReset();
+        mockConfirm.mockResolvedValue(true);
     });
 
     afterEach(() => {
@@ -219,8 +241,6 @@ describe("MyBookings Page", () => {
     });
 
     it("should display an alert when updating seats fails", async () => {
-        const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
-
         mockApi.mockImplementation((url, options) => {
         if (options?.method === "PUT") {
             return Promise.reject(new Error("Failed to update seats."));
@@ -237,13 +257,13 @@ describe("MyBookings Page", () => {
 
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-        await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith("Failed to update seats.");
-        });
+        expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Failed to update seats."
+        );
     });
 
     it("should cancel a booking when the user confirms cancellation", async () => {
-        vi.spyOn(window, "confirm").mockReturnValue(true);
+        mockConfirm.mockResolvedValue(true);
 
         renderMyBookings();
 
@@ -258,13 +278,22 @@ describe("MyBookings Page", () => {
         );
         });
 
+        expect(mockConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Cancel this booking?" })
+        );
+
+        // Success notice (wording differs slightly between versions of the page)
+        expect(await screen.findByRole("status")).toHaveTextContent(
+        /booking.*cancelled/i
+        );
+
         expect(
         screen.queryByText("Interstellar")
         ).not.toBeInTheDocument();
     });
 
     it("should not cancel a booking when the user rejects confirmation", async () => {
-        vi.spyOn(window, "confirm").mockReturnValue(false);
+        mockConfirm.mockResolvedValue(false);
 
         renderMyBookings();
 
@@ -272,13 +301,17 @@ describe("MyBookings Page", () => {
         await screen.findByRole("button", { name: "Cancel Pass" })
         );
 
+        await waitFor(() => expect(mockConfirm).toHaveBeenCalled());
+
+        // Let the (declined) confirmation promise settle before asserting
+        await Promise.resolve();
+
         expect(mockApi).toHaveBeenCalledTimes(1);
         expect(mockApi).toHaveBeenCalledWith("/bookings/my");
     });
 
     it("should display an alert when booking cancellation fails", async () => {
-        const alertSpy = vi.spyOn(window, "alert").mockImplementation(() => {});
-        vi.spyOn(window, "confirm").mockReturnValue(true);
+        mockConfirm.mockResolvedValue(true);
 
         mockApi.mockImplementation((url) => {
         if (url === "/bookings/booking-1") {
@@ -294,8 +327,8 @@ describe("MyBookings Page", () => {
         await screen.findByRole("button", { name: "Cancel Pass" })
         );
 
-        await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith("Failed to cancel booking.");
-        });
+        expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Failed to cancel booking."
+        );
     });
 });

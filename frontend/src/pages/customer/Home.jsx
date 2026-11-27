@@ -1,8 +1,10 @@
 import { useEffect, useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../../services/api.js";
 import MovieCard from "../../components/MovieCard.jsx";
-import { MOVIE_STATUS, statusOf } from "../../constants/movieOptions.js";
+import { MOVIE_STATUS, MOVIE_STATUS_LABELS, statusOf } from "../../constants/movieOptions.js";
 import "../../styles/Home.css";
+import "../../styles/HomeHero.css";
 
 const TABS = [
   { key: MOVIE_STATUS.NOW_SHOWING, label: "Now Showing", empty: "No movies are showing right now." },
@@ -101,60 +103,80 @@ export default function Home() {
     });
   }, [tabMovies, searchTerm, activeGenre]);
 
-  // Featured movie: the first movie that is now showing (or any movie as a fallback)
+  // Featured movie: the one an admin ticked "Homepage Featured Movie" for (Now Showing first, then
+  // Coming Soon). If none is ticked: the first Now Showing movie, then any movie.
+  const featuredPicks = movies.filter((m) => m.featured === true);
   const featuredMovie =
-    movies.find((m) => statusOf(m) === MOVIE_STATUS.NOW_SHOWING) || movies[0] || null;
+    featuredPicks.find((m) => statusOf(m) === MOVIE_STATUS.NOW_SHOWING) ||
+    featuredPicks.find((m) => statusOf(m) === MOVIE_STATUS.COMING_SOON) ||
+    movies.find((m) => statusOf(m) === MOVIE_STATUS.NOW_SHOWING) ||
+    movies[0] ||
+    null;
 
   const currentTab = TABS.find((tab) => tab.key === activeTab);
+  const featuredGenres = Array.isArray(featuredMovie?.genre)
+    ? featuredMovie.genre.join(" · ")
+    : featuredMovie?.genre || "";
 
   return (
     <>
-      {/* CINEMATIC HERO SECTION */}
-      <section className="hero">
-        <div className="hero-grid">
-          <div className="hero-content">
-            <span className="eyebrow">YOUR NEXT MOVIE NIGHT STARTS HERE</span>
-            <h1>More than a movie.<br /><em>Make it a moment.</em></h1>
-            <p>
-              {featuredMovie?.synopsis ||
-                "Discover your next favourite film, choose your seats, and book your cinema experience in minutes across three real-time synchronized halls."}
-            </p>
+      {/* FEATURED MOVIE HERO: the movie title is the headline, the poster is the backdrop */}
+      <section
+        className="hf"
+        style={featuredMovie?.poster ? { "--hf-poster": `url("${String(featuredMovie.poster).replace(/"/g, "%22")}")` } : undefined}
+      >
+        <div className="hf-inner">
+          <div className="hf-copy">
+            {featuredMovie ? (
+              <>
+                <span className="hf-eyebrow">
+                  <i aria-hidden="true">★</i> Featured · {MOVIE_STATUS_LABELS[statusOf(featuredMovie)] || "Now Showing"}
+                </span>
+                <h1 className="hf-title">{featuredMovie.title}</h1>
 
-            {featuredMovie && (
-              <div className="hero-meta">
-                {featuredMovie.genre && (
-                  <span>
-                    {Array.isArray(featuredMovie.genre) ? featuredMovie.genre.join(" • ") : featuredMovie.genre}
-                  </span>
-                )}
-                {featuredMovie.duration && <span>⏱️ {featuredMovie.duration} min</span>}
-              </div>
+                <div className="hf-meta">
+                  {featuredGenres && <span>{featuredGenres}</span>}
+                  {featuredMovie.duration && <span>{featuredMovie.duration} min</span>}
+                  {featuredMovie.rating && <span>{featuredMovie.rating}</span>}
+                </div>
+
+                <p className="hf-desc">
+                  {featuredMovie.description || featuredMovie.synopsis ||
+                    "Choose your seats and book your cinema experience in minutes."}
+                </p>
+
+                <div className="hf-actions">
+                  <Link to={`/movies/${featuredMovie._id}`} className="hf-btn hf-btn-primary">
+                    {statusOf(featuredMovie) === MOVIE_STATUS.NOW_SHOWING ? "Book now" : "View details"}
+                    <span aria-hidden="true"> →</span>
+                  </Link>
+                  <a href="#movies-catalog" className="hf-btn hf-btn-ghost">Browse all movies</a>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="hf-eyebrow">Your next movie night starts here</span>
+                <h1 className="hf-title">More than a movie.<br /><em>Make it a moment.</em></h1>
+                <p className="hf-desc">
+                  Discover your next favourite film, choose your seats, and book your cinema experience in minutes.
+                </p>
+                <div className="hf-actions">
+                  <a href="#movies-catalog" className="hf-btn hf-btn-primary">Explore movies <span aria-hidden="true">→</span></a>
+                </div>
+              </>
             )}
-
-            <div>
-              <a
-                href={featuredMovie ? `#movie-${featuredMovie._id}` : "#movies-catalog"}
-                className="button btn-primary"
-              >
-                {featuredMovie ? `Explore ${featuredMovie.title}` : "Explore Movies"}
-              </a>
-            </div>
           </div>
 
-          <div className="hero-poster-wrapper">
-            <div className="featured-poster-card">
-              <div className="featured-poster-img">
-                {featuredMovie?.poster ? (
-                  <img src={featuredMovie.poster} alt={featuredMovie.title} />
-                ) : (
-                  <div className="placeholder-poster">
-                    <span className="eyebrow">NOW SHOWING</span>
-                    <h3>THE BIG SCREEN</h3>
-                    <p>FEATURED FILM</p>
-                    <strong>Find your next favourite</strong>
-                  </div>
-                )}
-              </div>
+          <div className="hf-poster-wrap">
+            <div className="hf-poster">
+              {featuredMovie?.poster ? (
+                <img src={featuredMovie.poster} alt={`${featuredMovie.title} poster`} />
+              ) : (
+                <div className="hf-poster-fallback">
+                  <span>THE BIG SCREEN</span>
+                  <strong>Find your next favourite</strong>
+                </div>
+              )}
             </div>
           </div>
         </div>
