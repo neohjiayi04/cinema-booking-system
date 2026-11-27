@@ -7,13 +7,41 @@ import {
   within
 } from "@testing-library/react";
 
-const { mockApi } = vi.hoisted(() => ({
-  mockApi: vi.fn()
+const { mockApi, mockConfirm } = vi.hoisted(() => ({
+  mockApi: vi.fn(),
+  mockConfirm: vi.fn()
 }));
 
 vi.mock("../../services/api.js", () => ({
   api: mockApi
 }));
+
+// The page reports errors / notices through PopupHost and asks for delete
+// confirmation through useConfirm(). Replace both with deterministic versions
+// so these tests do not depend on how the real popup is styled or animated.
+vi.mock("../../components/Popup.jsx", async () => {
+  const { createElement: h, Fragment } = await import("react");
+
+  return {
+    default: ({ error, notice }) =>
+      h(
+        Fragment,
+        null,
+        error ? h("div", { role: "alert" }, error) : null,
+        notice ? h("div", { role: "status" }, notice) : null
+      ),
+    useConfirm: () => [mockConfirm, null]
+  };
+});
+
+vi.mock("../../components/ActionButton.jsx", async () => {
+  const { createElement: h } = await import("react");
+
+  return {
+    default: ({ children, onClick, disabled, title }) =>
+      h("button", { type: "button", onClick, disabled, title }, children)
+  };
+});
 
 import Movies from "./Movies.jsx";
 
@@ -71,7 +99,8 @@ async function waitForMovies() {
 
 function getMovieRow(title) {
   const titleElement = screen.getByText(title);
-  return titleElement.closest(".table-row");
+  // Each movie is rendered as a ".mv-row" block (not a table row)
+  return titleElement.closest(".mv-row");
 }
 
 function getGenreFilter() {
@@ -83,8 +112,9 @@ describe("Admin Movies Page", () => {
     vi.clearAllMocks();
 
     mockApi.mockResolvedValue(sampleMovies);
+    mockConfirm.mockReset();
+    mockConfirm.mockResolvedValue(true);
 
-    vi.stubGlobal("confirm", vi.fn(() => true));
     vi.stubGlobal("scrollTo", vi.fn());
   });
 
@@ -336,12 +366,13 @@ describe("Admin Movies Page", () => {
     fireEvent.click(within(row).getByRole("button", { name: "Edit" }));
 
     expect(
-      screen.getByRole("heading", { name: "Edit Movie Details" })
+      // The heading also contains an "Editing" pill, so match the start only
+      screen.getByRole("heading", { name: /^Edit Movie Details/ })
     ).toBeInTheDocument();
 
     expect(screen.getByLabelText("Title")).toHaveValue("Interstellar");
     expect(screen.getByLabelText("Genre")).toHaveValue("Sci-Fi");
-    expect(screen.getByLabelText("Duration (minutes)")).toHaveValue(169);
+    expect(screen.getByLabelText("Duration (min)")).toHaveValue(169);
     expect(screen.getByLabelText("Rating")).toHaveValue("PG-13");
     expect(screen.getByLabelText("Start Date (Release)")).toHaveValue("2026-11-20");
     expect(screen.getByRole("button", { name: "Update Movie" })).toBeInTheDocument();
@@ -419,18 +450,25 @@ describe("Admin Movies Page", () => {
 
     fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
 
-    expect(confirm).toHaveBeenCalledWith("Delete this movie?");
-
     await waitFor(() => {
       expect(mockApi).toHaveBeenCalledWith(
         "/movies/movie001",
         { method: "DELETE" }
       );
     });
+
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Delete this movie?",
+        message: expect.stringContaining('"Interstellar"')
+      })
+    );
+
+    expect(await screen.findByRole("status")).toHaveTextContent("Movie deleted.");
   });
 
   it("should not delete a movie when deletion is cancelled", async () => {
-    confirm.mockReturnValue(false);
+    mockConfirm.mockResolvedValue(false);
 
     renderMovies();
 
@@ -440,7 +478,14 @@ describe("Admin Movies Page", () => {
 
     fireEvent.click(within(row).getByRole("button", { name: "Delete" }));
 
-    expect(confirm).toHaveBeenCalledWith("Delete this movie?");
+    await waitFor(() => {
+      expect(mockConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Delete this movie?" })
+      );
+    });
+
+    // Let the (declined) confirmation promise settle before asserting
+    await Promise.resolve();
 
     expect(mockApi).not.toHaveBeenCalledWith(
       "/movies/movie001",

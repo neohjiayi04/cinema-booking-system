@@ -1,403 +1,129 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import { api } from "../../services/api.js";
-import PopupHost, { useConfirm } from "../../components/Popup.jsx";
 import "../../styles/MyBookings.css";
 
-function getBookingCategory(booking) {
-  if (booking.status === "CANCELLED") {
-    return "cancelled";
-  }
+export default function BookingConfirmation() {
+  const { id } = useParams();
 
-  if (booking.status === "COMPLETED") {
-    return "completed";
-  }
-
-  const date = booking.showtime?.date;
-  const startTime = booking.showtime?.startTime;
-  const duration = Number(booking.movie?.duration || 120);
-
-  if (!date || !startTime) {
-    return "upcoming";
-  }
-
-  // Cinema timezone: Malaysia (UTC+8)
-  const startDateTime = new Date(`${date}T${startTime}:00+08:00`);
-  const endDateTime = new Date(
-    startDateTime.getTime() + duration * 60 * 1000
-  );
-
-  return endDateTime <= new Date() ? "completed" : "upcoming";
-}
-
-export default function MyBookings() {
-  const [bookings, setBookings] = useState([]);
-  const [editingBooking, setEditingBooking] = useState(null);
-  const [newSeats, setNewSeats] = useState("");
-  const [activeTab, setActiveTab] = useState("upcoming");
-
-  // Pop-up messages (success / error)
-  const [notice, setNotice] = useState("");
+  const [booking, setBooking] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [askConfirm, confirmDialog] = useConfirm();
-
-  const fetchBookings = async () => {
-    const data = await api("/bookings/my");
-    setBookings(Array.isArray(data) ? data : data.bookings || []);
-    return Array.isArray(data) ? data : data.bookings || [];
-  };
+  const [copied, setCopied] = useState(false);
+  const resetTimer = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadBookings() {
-      try {
-        const data = await api("/bookings/my");
-
+    api(`/bookings/${id}`)
+      .then((data) => {
+        if (!cancelled) setBooking(data);
+      })
+      .catch((err) => {
         if (!cancelled) {
-          setBookings(Array.isArray(data) ? data : data.bookings || []);
+          setError(err.message || "Unable to load your booking.");
         }
-      } catch (err) {
-        console.error("Failed to load bookings:", err);
-
-        if (!cancelled) {
-          setError(err.message || "Unable to load your bookings.");
-        }
-      }
-    }
-
-    loadBookings();
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
     return () => {
       cancelled = true;
+      clearTimeout(resetTimer.current);
     };
-  }, []);
+  }, [id]);
 
-  // Add the filtered bookings based on the active tab
-  const upcomingBookings = bookings.filter(
-    (b) => getBookingCategory(b) === "upcoming"
-  );
-
-  const completedBookings = bookings.filter(
-    (b) => getBookingCategory(b) === "completed"
-  );
-
-  const cancelledBookings = bookings.filter(
-    (b) => getBookingCategory(b) === "cancelled"
-  );
-
-  const filteredBookings = {
-    upcoming: upcomingBookings,
-    completed: completedBookings,
-    cancelled: cancelledBookings,
-  }[activeTab];
-
-  // DELETE operation
-  const handleDelete = async (id) => {
-    const booking = bookings.find((b) => b._id === id);
-
-    const ok = await askConfirm({
-      title: "Cancel this booking?",
-      message: booking?.bookingReference
-        ? `Booking #${booking.bookingReference}${
-            booking.movie?.title ? ` for "${booking.movie.title}"` : ""
-          } will be cancelled and your seats released.`
-        : "Your booking will be cancelled and your seats released.",
-      confirmText: "Yes, cancel booking",
-      cancelText: "Keep booking",
-      tone: "danger",
-      icon: "alert",
-    });
-
-    if (!ok) {
-      return;
-    }
-
-    setError("");
-    setNotice("");
+  async function copyReference() {
+    if (!booking?.bookingReference) return;
 
     try {
-      await api(`/bookings/${id}`, { method: "DELETE" });
+      await navigator.clipboard.writeText(booking.bookingReference);
+      setCopied(true);
 
-      setBookings((prev) =>
-        prev.map((b) =>
-          b._id === id
-            ? { ...b, status: "CANCELLED" }
-            : b
-        )
-      );
-
-      setEditingBooking(null);
-
-      setNotice(
-        booking?.bookingReference
-          ? `Booking #${booking.bookingReference} has been cancelled.`
-          : "Your booking has been cancelled."
-      );
-    } catch (err) {
-      setError(err.message || "Failed to cancel booking.");
+      clearTimeout(resetTimer.current);
+      resetTimer.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
     }
-  };
+  }
 
-  // UPDATE operation
-  const handleEditClick = (booking) => {
-    setError("");
-    setNotice("");
-    setEditingBooking(booking._id);
-    setNewSeats(booking.seats.join(", "));
-  };
+  if (loading) {
+    return <div className="bookings-page-wrapper">Loading your ticket...</div>;
+  }
 
-  const handleUpdateSubmit = async (id) => {
-    setError("");
-    setNotice("");
+  if (error || !booking) {
+    return (
+      <div className="bookings-page-wrapper">
+        <p role="alert">{error || "Booking not found."}</p>
+        <Link to="/my-bookings">View My Bookings</Link>
+      </div>
+    );
+  }
 
-    const booking = bookings.find((b) => b._id === id);
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
+    booking.bookingReference
+  )}`;
 
-    const updatedSeatArray = newSeats
-      .split(",")
-      .map((s) => s.trim().toUpperCase())
-      .filter(Boolean);
-
-    const ok = await askConfirm({
-      title: "Change your seats?",
-      message: `Your seats will change from ${
-        booking?.seats?.join(", ") || "your current seats"
-      } to ${updatedSeatArray.join(", ") || "—"}.`,
-      confirmText: "Confirm change",
-      cancelText: "Keep current seats",
-      tone: "info",
-      icon: "edit",
-    });
-
-    if (!ok) {
-      return;
-    }
-
-    try {
-      await api(`/bookings/${id}`, {
-        method: "PUT",
-        body: JSON.stringify({ seats: updatedSeatArray }),
-      });
-
-      // Fetch fully populated bookings after update
-      await fetchBookings();
-
-      setEditingBooking(null);
-      setNewSeats("");
-
-      setNotice(`Your seats have been updated to ${updatedSeatArray.join(", ")}.`);
-    } catch (err) {
-      setError(err.message || "Failed to update booking.");
-    }
-  };
+  const amount = Number(booking.totalAmount);
 
   return (
     <div className="bookings-page-wrapper">
-      {/* Centered pop-up messages */}
-      <PopupHost
-        error={error}
-        notice={notice}
-        onCloseError={() => setError("")}
-        onCloseNotice={() => setNotice("")}
-      />
-      {confirmDialog}
-
       <section className="bookings-page-container">
+        <span className="eyebrow">BOOKING CONFIRMED</span>
+        <h1>You are all set!</h1>
 
-        {/* Page Title Header */}
-        <div className="bookings-header">
-          <div>
-            <span className="eyebrow">ACCOUNT</span>
-            <h1>My Bookings & Reservations</h1>
-            <p className="sub-description">
-              Manage movie digital passes, update seat selections, or request cancellations.
-            </p>
-          </div>
-          <div className="booking-tabs">
-            <button
-              className={`booking-tab ${activeTab === "upcoming" ? "active" : ""}`}
-              onClick={() => setActiveTab("upcoming")}
-            >
-              Upcoming
-              <span>{upcomingBookings.length}</span>
-            </button>
-
-            <button
-              className={`booking-tab ${activeTab === "completed" ? "active" : ""}`}
-              onClick={() => setActiveTab("completed")}
-            >
-              Completed
-              <span>{completedBookings.length}</span>
-            </button>
-
-            <button
-              className={`booking-tab ${activeTab === "cancelled" ? "active" : ""}`}
-              onClick={() => setActiveTab("cancelled")}
-            >
-              Cancelled
-              <span>{cancelledBookings.length}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Bookings Container */}
-        <div className="booking-list">
-          {filteredBookings.map((b) => {
-            // Generate QR Code dynamic URL
-            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(
-              b.bookingReference
-            )}`;
-
-            return (
-              <article className="ticket-card" key={b._id}>
-
-                {/* 1. Poster Thumbnail */}
-                <div className="ticket-poster-container">
-                  <img
-                    src={
-                      b.movie?.poster ||
-                      b.movie?.posterUrl ||
-                      "https://placehold.co/150x220?text=No+Poster"
-                    }
-                    alt={b.movie?.title || "Movie"}
-                    className="ticket-poster"
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src =
-                        "https://placehold.co/150x220?text=No+Poster";
-                    }}
-                  />
-                </div>
-
-                {/* 2. Main Ticket Details */}
-                <div className="ticket-details">
-                  <div className="ticket-status-row">
-                    <span className={`booking-status-pill ${getBookingCategory(b)}`}>
-                      <span className="status-dot"></span>
-                      {getBookingCategory(b) === "upcoming"
-                        ? "Confirmed"
-                        : getBookingCategory(b) === "completed"
-                        ? "Completed"
-                        : "Cancelled"}
-                    </span>
-
-                    <span className="ref-number">
-                      Ref #{b.bookingReference}
-                    </span>
-                  </div>
-
-                  <h2 className="movie-title">{b.movie?.title || "Movie Ticket"}</h2>
-                  <p className="movie-meta">Standard Admission · Cinema Display</p>
-
-                  {/* Highlight Info Box */}
-                  <div className="ticket-info-grid">
-                    <div>
-                      <span className="info-label">Date</span>
-                      <strong className="info-val">{b.showtime?.date || "Today"}</strong>
-                    </div>
-                    <div>
-                      <span className="info-label">Showtime</span>
-                      <strong className="info-val">{b.showtime?.startTime || "--:--"}</strong>
-                    </div>
-                    <div>
-                      <span className="info-label">Auditorium</span>
-                      <strong className="info-val">{b.hall?.name || "Main Hall"}</strong>
-                    </div>
-                    <div>
-                      <span className="info-label">Seats</span>
-                      {editingBooking === b._id ? (
-                        <input
-                          type="text"
-                          className="edit-seats-input"
-                          value={newSeats}
-                          onChange={(e) => setNewSeats(e.target.value)}
-                        />
-                      ) : (
-                        <strong className="info-val">{b.seats?.join(", ")}</strong>
-                      )}
-                    </div>
-                    <div>
-                      <span className="info-label">Amount Paid</span>
-                      <strong className="info-val price">
-                        {b.totalAmount != null && Number.isFinite(Number(b.totalAmount))
-                          ? `RM ${Number(b.totalAmount).toFixed(2)}`
-                          : "RM —"}
-                      </strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 3. Ticket Side Pass & Actions (QR Code) */}
-                <div className="ticket-pass-section">
-                  <div className="qr-box">
-                    <img src={qrUrl} alt="Pass QR Code" className="qr-image" />
-                  </div>
-                  <span className="pass-caption">PASS CODE ACTIVE</span>
-
-                  <div className="ticket-actions">
-                    {getBookingCategory(b) === "upcoming" ? (
-                      editingBooking === b._id ? (
-                        <div className="edit-btn-group">
-                          <button
-                            className="btn-save"
-                            onClick={() => handleUpdateSubmit(b._id)}
-                          >
-                            Save
-                          </button>
-
-                          <button
-                            className="btn-cancel-edit"
-                            onClick={() => {
-                              setEditingBooking(null);
-                              setNewSeats("");
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <button
-                            className="btn-modify"
-                            onClick={() => handleEditClick(b)}
-                          >
-                            Modify Seats
-                          </button>
-
-                          <button
-                            className="btn-delete"
-                            onClick={() => handleDelete(b._id)}
-                          >
-                            Cancel Pass
-                          </button>
-                        </>
-                      )
-                    ) : (
-                      <span className="ticket-history-label">
-                        {getBookingCategory(b) === "completed"
-                          ? "Showtime Completed"
-                          : "Booking Cancelled"}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-              </article>
-            );
-          })}
-        </div>
-
-        {filteredBookings.length === 0 && (
-          <div className="empty-state">
-            <p>
-              {activeTab === "upcoming"
-                ? "You have no upcoming bookings."
-                : activeTab === "completed"
-                ? "You have no completed movie tickets yet."
-                : "You have no cancelled bookings."}
-            </p>
-          </div>
+        {booking.movie?.title && (
+          <h2 className="movie-title">{booking.movie.title}</h2>
         )}
 
+        {booking.showtime?.date && (
+          <p className="movie-meta">
+            {booking.showtime.date}
+            {booking.showtime.startTime ? ` · ${booking.showtime.startTime}` : ""}
+            {booking.hall?.name ? ` · ${booking.hall.name}` : ""}
+          </p>
+        )}
+
+        <div className="qr-box">
+          <img src={qrUrl} alt="Booking QR Code" className="qr-image" />
+        </div>
+
+        <div className="ticket-info-grid">
+          <div>
+            <span className="info-label">Booking reference</span>
+            <button
+              type="button"
+              className="ref-number"
+              title="Click to copy"
+              onClick={copyReference}
+            >
+              <strong>{booking.bookingReference}</strong>
+              <span>{copied ? "Copied!" : "Copy"}</span>
+            </button>
+          </div>
+
+          <div>
+            <span className="info-label">Seats</span>
+            <strong className="info-val">{(booking.seats || []).join(", ")}</strong>
+          </div>
+
+          <div>
+            <span className="info-label">Total</span>
+            <strong className="info-val price">
+              {Number.isFinite(amount) ? `RM ${amount.toFixed(2)}` : "RM —"}
+            </strong>
+          </div>
+
+          <div>
+            <span className="info-label">Status</span>
+            <strong className="info-val">{booking.status}</strong>
+          </div>
+        </div>
+
+        <Link to="/my-bookings" className="btn-modify">
+          View My Bookings
+        </Link>
       </section>
     </div>
   );

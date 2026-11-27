@@ -3,7 +3,8 @@ import {
   render,
   screen,
   fireEvent,
-  waitFor
+  waitFor,
+  within
 } from "@testing-library/react";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import SeatBooking from "./SeatBooking.jsx";
@@ -21,6 +22,47 @@ vi.mock("../../services/api.js", () => ({
 vi.mock("../../services/websocket.js", () => ({
   connectShowtime: mockConnectShowtime
 }));
+
+// A simple seat map: one button per seat, titled "Seat A01 - Available" etc.
+vi.mock("../../components/SeatMap.jsx", async () => {
+  const { createElement: h } = await import("react");
+
+  return {
+    default: ({
+      rows,
+      seatsPerRow,
+      bookedSeats = [],
+      selectedSeats = [],
+      onToggle
+    }) => {
+      const seats = [];
+
+      for (let row = 0; row < rows; row++) {
+        for (let number = 1; number <= seatsPerRow; number++) {
+          const id = `${String.fromCharCode(65 + row)}${String(number).padStart(2, "0")}`;
+          const booked = bookedSeats.includes(id);
+          const selected = selectedSeats.includes(id);
+
+          seats.push(
+            h(
+              "button",
+              {
+                key: id,
+                type: "button",
+                disabled: booked,
+                title: `Seat ${id} - ${booked ? "Booked" : selected ? "Selected" : "Available"}`,
+                onClick: () => onToggle(id)
+              },
+              id
+            )
+          );
+        }
+      }
+
+      return h("div", null, seats);
+    }
+  };
+});
 
 const mockShowtime = {
   _id: "showtime-123",
@@ -163,8 +205,12 @@ describe("SeatBooking Page", () => {
     fireEvent.click(screen.getByTitle("Seat A02 - Available"));
 
     expect(screen.getByText("2")).toBeInTheDocument();
-    expect(screen.getByText("A01")).toBeInTheDocument();
-    expect(screen.getByText("A02")).toBeInTheDocument();
+
+    // Seat labels also appear on the seat map buttons, so look in the summary
+    const summary = document.querySelector(".selected-seats-pills");
+    expect(within(summary).getByText("A01")).toBeInTheDocument();
+    expect(within(summary).getByText("A02")).toBeInTheDocument();
+
     expect(screen.getByText("RM 25.00")).toBeInTheDocument();
   });
 

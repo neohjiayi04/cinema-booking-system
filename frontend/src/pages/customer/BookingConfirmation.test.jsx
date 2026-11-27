@@ -159,28 +159,35 @@ describe("BookingConfirmation Page", () => {
 
     fireEvent.click(copyButton);
 
-    expect(mockWriteText).toHaveBeenCalledWith("CINEMA123");
+    await waitFor(() => {
+      expect(mockWriteText).toHaveBeenCalledWith("CINEMA123");
+    });
 
     expect(await screen.findByText("Copied!")).toBeInTheDocument();
   });
 
-it("should reset the copied message after two seconds", async () => {
-  renderConfirmation();
+  it("should reset the copied message after two seconds", async () => {
+    renderConfirmation();
 
-  await screen.findByText("CINEMA123");
+    await screen.findByText("CINEMA123");
 
-  vi.useFakeTimers();
+    vi.useFakeTimers();
 
-  fireEvent.click(screen.getByTitle("Click to copy"));
+    // Clipboard writes are asynchronous, so click inside an async act() to let
+    // the "copied" state update flush before asserting.
+    await act(async () => {
+      fireEvent.click(screen.getByTitle("Click to copy"));
+    });
 
-  expect(screen.getByText("Copied!")).toBeInTheDocument();
+    expect(screen.getByText("Copied!")).toBeInTheDocument();
 
-  await act(async () => {
-    await vi.advanceTimersByTimeAsync(2000);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(screen.queryByText("Copied!")).not.toBeInTheDocument();
+    expect(screen.getByText("Copy")).toBeInTheDocument();
   });
-
-  expect(screen.getByText("Copy")).toBeInTheDocument();
-});
 
   it("should not copy a booking reference when no booking is available", () => {
     mockApi.mockReturnValue(new Promise(() => {}));

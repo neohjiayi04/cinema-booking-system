@@ -4,6 +4,7 @@ import {
   screen,
   fireEvent,
   waitFor,
+  within,
   act
 } from "@testing-library/react";
 import {
@@ -38,6 +39,80 @@ vi.mock("../../services/websocket.js", () => ({
   connectShowtime: mockConnectShowtime
 }));
 
+// A simple seat map: one button per seat, titled "Seat A01 - Available" etc.
+vi.mock("../../components/SeatMap.jsx", async () => {
+  const { createElement: h } = await import("react");
+
+  return {
+    default: ({
+      rows,
+      seatsPerRow,
+      bookedSeats = [],
+      selectedSeats = [],
+      onToggle
+    }) => {
+      const seats = [];
+
+      for (let row = 0; row < rows; row++) {
+        for (let number = 1; number <= seatsPerRow; number++) {
+          const id = `${String.fromCharCode(65 + row)}${String(number).padStart(2, "0")}`;
+          const booked = bookedSeats.includes(id);
+          const selected = selectedSeats.includes(id);
+
+          seats.push(
+            h(
+              "button",
+              {
+                key: id,
+                type: "button",
+                disabled: booked,
+                title: `Seat ${id} - ${booked ? "Booked" : selected ? "Selected" : "Available"}`,
+                onClick: () => onToggle(id)
+              },
+              id
+            )
+          );
+        }
+      }
+
+      return h("div", null, seats);
+    }
+  };
+});
+
+// The real 3D hall preview needs WebGL, which jsdom does not provide.
+vi.mock("../../components/SeatPicker/SeatPreview3D.jsx", async () => {
+  const { createElement: h } = await import("react");
+
+  return {
+    default: () => h("div", { "data-testid": "seat-preview-3d" }),
+    PreviewSwitch: ({ checked, onChange }) =>
+      h(
+        "label",
+        null,
+        h("input", {
+          type: "checkbox",
+          checked,
+          onChange: (event) => onChange(event.target.checked)
+        }),
+        "3D preview"
+      )
+  };
+});
+
+// The page only offers showtimes that have not started yet, so every date is
+// generated relative to today. Fixed dates would eventually fall in the past
+// and the page would hide them.
+function daysFromNow(days) {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+}
+
+const day1 = daysFromNow(3);
+const day2 = daysFromNow(4);
+const pastDay = daysFromNow(-3);
+
 const movie = {
   _id: "movie-1",
   title: "Interstellar",
@@ -45,20 +120,23 @@ const movie = {
   duration: 169,
   rating: "PG-13",
   description: "A journey beyond the stars.",
-  poster: "https://example.com/interstellar.jpg"
+  poster: "https://example.com/interstellar.jpg",
+  status: "NOW_SHOWING",
+  bookable: true,
+  releaseDate: daysFromNow(-10)
 };
 
 const showtimes = [
   {
     _id: "showtime-1",
-    date: "2026-11-20",
+    date: day1,
     startTime: "19:30",
     price: 12.5,
     hall: { name: "Hall 1" }
   },
   {
     _id: "showtime-2",
-    date: "2026-11-21",
+    date: day2,
     startTime: "21:00",
     price: 15,
     hall: { name: "Hall 2" }
@@ -67,7 +145,7 @@ const showtimes = [
 
 const showtimeDetails = {
   _id: "showtime-1",
-  date: "2026-11-20",
+  date: day1,
   startTime: "19:30",
   price: 12.5,
   bookedSeats: ["A03"],
@@ -80,7 +158,7 @@ const showtimeDetails = {
 
 const secondShowtimeDetails = {
   _id: "showtime-2",
-  date: "2026-11-21",
+  date: day2,
   startTime: "21:00",
   price: 15,
   bookedSeats: [],
@@ -131,6 +209,16 @@ function setupDefaultApi() {
 
     throw new Error(`Unexpected API request: ${path}`);
   });
+}
+
+// Date tabs and time chips are plain buttons inside labelled groups, so find
+// them by group instead of by the (formatted) label text.
+function getDateTabs() {
+  return within(screen.getByLabelText("Choose a date")).getAllByRole("button");
+}
+
+function getTimeChips() {
+  return within(screen.getByLabelText("Choose a showtime")).getAllByRole("button");
 }
 
 describe("MovieDetails Page", () => {
@@ -192,28 +280,63 @@ describe("MovieDetails Page", () => {
     );
   });
 
-it("should display available showtimes", async () => {
-  renderMovieDetails();
+  it("should display available showtimes", async () => {
+    renderMovieDetails();
 
-  await screen.findByRole("heading", { name: "Interstellar" });
+    await screen.findByRole("heading", { name: "Interstellar" });
 
-  // Verify both showtime cards.
-  expect(screen.getByText("2026-11-20")).toBeInTheDocument();
-  expect(screen.getByText("19:30")).toBeInTheDocument();
-  expect(screen.getByText("2026-11-21")).toBeInTheDocument();
-  expect(screen.getByText("21:00")).toBeInTheDocument();
+    // One tab per date, and the first date's showtimes are shown as chips
+    const tabs = getDateTabs();
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0]).toHaveAttribute("aria-pressed", "true");
+    expect(tabs[1]).toHaveAttribute("aria-pressed", "false");
 
-  // Wait until the selected show's seating details have loaded.
-  await screen.findByText("Hall 1 - No seats selected");
+    let chips = getTimeChips();
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toHaveTextContent("19:30");
+    expect(chips[0]).toHaveTextContent("Hall 1 · RM 12.50");
+    expect(chips[0]).toHaveAttribute("aria-pressed", "true");
 
-  // Hall 1 appears in its showtime card and selected screening.
-  expect(screen.getAllByText("Hall 1")).toHaveLength(2);
+    // Wait until the selected showtime's seating details have loaded
+    await screen.findByText("Hall 1 - No seats selected");
 
-  expect(screen.getByText("Hall 2")).toBeInTheDocument();
+    // The second date lists its own showtime
+    fireEvent.click(tabs[1]);
 
-  expect(screen.getByText("RM 12.50")).toBeInTheDocument();
-  expect(screen.getByText("RM 15.00")).toBeInTheDocument();
-});
+    chips = getTimeChips();
+    expect(chips).toHaveLength(1);
+    expect(chips[0]).toHaveTextContent("21:00");
+    expect(chips[0]).toHaveTextContent("Hall 2 · RM 15.00");
+  });
+
+  it("should hide showtimes that have already started", async () => {
+    mockApi.mockImplementation(async (path) => {
+      if (path === "/movies/movie-1") return movie;
+      if (path === "/showtimes?movieId=movie-1") {
+        return [
+          {
+            _id: "showtime-past",
+            date: pastDay,
+            startTime: "10:00",
+            price: 9,
+            hall: { name: "Hall 9" }
+          },
+          ...showtimes
+        ];
+      }
+      if (path === "/showtimes/showtime-1") return showtimeDetails;
+
+      throw new Error(`Unexpected API request: ${path}`);
+    });
+
+    renderMovieDetails();
+
+    await screen.findByText("Hall 1 - No seats selected");
+
+    expect(getDateTabs()).toHaveLength(2);
+    expect(screen.queryByText(/Hall 9/)).not.toBeInTheDocument();
+    expect(mockApi).not.toHaveBeenCalledWith("/showtimes/showtime-past");
+  });
 
   it("should display an empty message when there are no showtimes", async () => {
     mockApi.mockImplementation(async (path) => {
@@ -226,7 +349,7 @@ it("should display available showtimes", async () => {
 
     expect(
       await screen.findByText(
-        "There are no showtimes available for this movie yet."
+        "There are no upcoming showtimes for this movie."
       )
     ).toBeInTheDocument();
   });
@@ -253,7 +376,7 @@ it("should display the seating plan after selecting a showtime", async () => {
     await screen.findByTitle("Seat A01 - Available")
   ).toBeInTheDocument();
 
-  expect(screen.getAllByText("Hall 1")).toHaveLength(2);
+  expect(screen.getByText("Hall 1 - No seats selected")).toBeInTheDocument();
   expect(screen.getByTitle("Seat A03 - Booked")).toBeDisabled();
 });
 
@@ -416,13 +539,15 @@ it("should display the seating plan after selecting a showtime", async () => {
 
     await screen.findByTitle("Seat A01 - Available");
 
-    fireEvent.click(screen.getByRole("button", { name: /2026-11-21/ }));
+    // Choose the second date; its first showtime is selected automatically
+    fireEvent.click(getDateTabs()[1]);
 
     expect(
       await screen.findByTitle("Seat A01 - Available")
     ).toBeInTheDocument();
 
     expect(mockApi).toHaveBeenCalledWith("/showtimes/showtime-2");
+    expect(await screen.findByText("Hall 2 - No seats selected")).toBeInTheDocument();
     expect(screen.getByText("RM 0.00")).toBeInTheDocument();
   });
 
@@ -461,7 +586,9 @@ it("should restore a pending seat selection after returning from login", async (
     await screen.findByTitle("Seat A01 - Selected")
   ).toBeInTheDocument();
 
-  expect(screen.getAllByText("RM 12.50")).toHaveLength(2);
+  // One selected seat at RM 12.50 (the showtime chip text is "Hall 1 · RM 12.50")
+  expect(screen.getByText("RM 12.50")).toBeInTheDocument();
+  expect(screen.getByText("Hall 1 - A01")).toBeInTheDocument();
 });
 
   it("should automatically submit a saved booking when resuming after login", async () => {
@@ -501,6 +628,57 @@ it("should restore a pending seat selection after returning from login", async (
     expect(sessionStorage.getItem(PENDING_KEY)).toBeNull();
   });
 
+  it("should warn when a saved showtime is no longer available after login", async () => {
+    sessionStorage.setItem(
+      PENDING_KEY,
+      JSON.stringify({
+        movieId: "movie-1",
+        showtimeId: "showtime-gone",
+        seats: ["A01"]
+      })
+    );
+
+    renderMovieDetails("/movies/movie-1?resumeBooking=1");
+
+    const dialog = await screen.findByRole("alertdialog");
+
+    expect(
+      within(dialog).getByRole("heading", { name: "Showtime unavailable" })
+    ).toBeInTheDocument();
+    expect(dialog).toHaveTextContent(/no longer available/);
+    expect(sessionStorage.getItem(PENDING_KEY)).toBeNull();
+
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Choose another showtime" })
+    );
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+
+  it("should let the customer switch the 3D hall preview off and on", async () => {
+    renderMovieDetails();
+
+    await screen.findByTitle("Seat A01 - Available");
+
+    expect(screen.getByTestId("seat-preview-3d")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("3D preview"));
+
+    expect(screen.queryByTestId("seat-preview-3d")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("3D preview"));
+
+    expect(screen.getByTestId("seat-preview-3d")).toBeInTheDocument();
+  });
+
+  // The status is derived from the dates, so keep the two consistent
+  const datesFor = (status) =>
+    status === "COMING_SOON"
+      ? { releaseDate: daysFromNow(20), endDate: daysFromNow(60) }
+      : status === "ENDED"
+        ? { releaseDate: daysFromNow(-60), endDate: daysFromNow(-10) }
+        : { releaseDate: daysFromNow(-60), endDate: daysFromNow(-10) };
+
   it.each([
     ["COMING_SOON", "Coming soon", /Booking opens on/],
     ["ENDED", "No longer showing", /can no longer be booked/],
@@ -512,8 +690,7 @@ it("should restore a pending seat selection after returning from login", async (
           ...movie,
           status,
           bookable: false,
-          releaseDate: "2027-01-10",
-          endDate: "2027-02-10"
+          ...datesFor(status)
         };
       }
       if (path === "/showtimes?movieId=movie-1") return showtimes;
@@ -536,7 +713,7 @@ it("should restore a pending seat selection after returning from login", async (
   it("should still allow booking a Now Showing movie that has an end date", async () => {
     mockApi.mockImplementation(async (path) => {
       if (path === "/movies/movie-1") {
-        return { ...movie, status: "NOW_SHOWING", bookable: true, releaseDate: "2026-11-01", endDate: "2026-12-31" };
+        return { ...movie, status: "NOW_SHOWING", bookable: true, releaseDate: daysFromNow(-10), endDate: daysFromNow(30) };
       }
       if (path === "/showtimes?movieId=movie-1") return showtimes;
       if (path === "/showtimes/showtime-1") return showtimeDetails;

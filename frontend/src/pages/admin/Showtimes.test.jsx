@@ -1,27 +1,41 @@
-import {
-  describe,
-  it,
-  expect,
-  vi,
-  beforeEach,
-  afterEach,
-} from "vitest";
+import {describe, it,expect,vi,beforeEach,afterEach,} from "vitest";
+import {render,screen,fireEvent,waitFor,within,} from "@testing-library/react";
 
-import {
-  render,
-  screen,
-  fireEvent,
-  waitFor,
-  within,
-} from "@testing-library/react";
-
-const { mockApi } = vi.hoisted(() => ({
+const { mockApi, mockConfirm } = vi.hoisted(() => ({
   mockApi: vi.fn(),
+  mockConfirm: vi.fn(),
 }));
 
 vi.mock("../../services/api.js", () => ({
   api: mockApi,
 }));
+
+// The page reports errors / notices through PopupHost and asks for delete
+// confirmation through useConfirm(). Replace both with deterministic versions
+// so these tests do not depend on how the real popup is styled or animated.
+vi.mock("../../components/Popup.jsx", async () => {
+  const { createElement: h, Fragment } = await import("react");
+
+  return {
+    default: ({ error, notice }) =>
+      h(
+        Fragment,
+        null,
+        error ? h("div", { role: "alert" }, error) : null,
+        notice ? h("div", { role: "status" }, notice) : null
+      ),
+    useConfirm: () => [mockConfirm, null],
+  };
+});
+
+vi.mock("../../components/ActionButton.jsx", async () => {
+  const { createElement: h } = await import("react");
+
+  return {
+    default: ({ children, onClick, disabled, title }) =>
+      h("button", { type: "button", onClick, disabled, title }, children),
+  };
+});
 
 import Showtimes from "./Showtimes.jsx";
 
@@ -78,7 +92,9 @@ describe("Showtimes Admin Page", () => {
       return Promise.resolve({});
     });
 
-    vi.stubGlobal("confirm", vi.fn(() => true));
+    mockConfirm.mockReset();
+    mockConfirm.mockResolvedValue(true);
+
     vi.stubGlobal("scrollTo", vi.fn());
   });
 
@@ -103,7 +119,7 @@ describe("Showtimes Admin Page", () => {
   });
 
   it("should display the loading state initially", () => {
-    mockApi.mockReturnValue(new Promise(() => {}));
+    mockApi.mockImplementation(() => new Promise(() => {}));
 
     renderShowtimes();
 
@@ -416,13 +432,20 @@ describe("Showtimes Admin Page", () => {
       });
     });
 
-    expect(globalThis.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('Delete the showtime for "Interstellar"')
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Delete this showtime?",
+        message: expect.stringContaining('"Interstellar"'),
+      })
+    );
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Showtime has been deleted."
     );
   });
 
   it("should not delete a showtime when confirmation is cancelled", async () => {
-    globalThis.confirm.mockReturnValue(false);
+    mockConfirm.mockResolvedValue(false);
 
     renderShowtimes();
 
@@ -432,9 +455,14 @@ describe("Showtimes Admin Page", () => {
       screen.getAllByRole("button", { name: "Delete" })[0]
     );
 
-    expect(globalThis.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('Delete the showtime for "Interstellar"')
-    );
+    await waitFor(() => {
+      expect(mockConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({ title: "Delete this showtime?" })
+      );
+    });
+
+    // Let the (declined) confirmation promise settle before asserting
+    await Promise.resolve();
 
     expect(mockApi).not.toHaveBeenCalledWith("/showtimes/showtime1", {
       method: "DELETE",

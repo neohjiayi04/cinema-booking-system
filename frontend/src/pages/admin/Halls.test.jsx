@@ -1,13 +1,41 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
-const { mockApi } = vi.hoisted(() => ({
+const { mockApi, mockConfirm } = vi.hoisted(() => ({
   mockApi: vi.fn(),
+  mockConfirm: vi.fn(),
 }));
 
 vi.mock("../../services/api.js", () => ({
   api: mockApi,
 }));
+
+// The page reports errors / notices through PopupHost and asks for delete
+// confirmation through useConfirm(). Replace both with deterministic versions
+// so these tests do not depend on how the real popup is styled or animated.
+vi.mock("../../components/Popup.jsx", async () => {
+  const { createElement: h, Fragment } = await import("react");
+
+  return {
+    default: ({ error, notice }) =>
+      h(
+        Fragment,
+        null,
+        error ? h("div", { role: "alert" }, error) : null,
+        notice ? h("div", { role: "status" }, notice) : null
+      ),
+    useConfirm: () => [mockConfirm, null],
+  };
+});
+
+vi.mock("../../components/ActionButton.jsx", async () => {
+  const { createElement: h } = await import("react");
+
+  return {
+    default: ({ children, onClick, disabled, title }) =>
+      h("button", { type: "button", onClick, disabled, title }, children),
+  };
+});
 
 import Halls from "./Halls.jsx";
 
@@ -15,6 +43,28 @@ const halls = [
   { _id: "hall1", name: "Hall 1", rows: 5, seatsPerRow: 8 },
   { _id: "hall2", name: "Hall 2", rows: 6, seatsPerRow: 10 },
 ];
+
+// The page loads /halls, /showtimes and /movies on mount, so route by URL
+// instead of returning the same value for every call.
+function routeApi(overrides = {}) {
+  return (url, options) => {
+    const key = `${options?.method || "GET"} ${url}`;
+
+    if (key in overrides) {
+      const value = overrides[key];
+      return typeof value === "function" ? value(url, options) : value;
+    }
+
+    if (url === "/halls") return Promise.resolve(halls);
+    if (url === "/showtimes" || url === "/movies") return Promise.resolve([]);
+
+    return Promise.resolve({});
+  };
+}
+
+function mutationCalls() {
+  return mockApi.mock.calls.filter(([, options]) => options?.method);
+}
 
 function renderHalls() {
   return render(<Halls />);
@@ -28,7 +78,10 @@ describe("Halls Admin Page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockApi.mockResolvedValue(halls);
+    mockApi.mockReset();
+    mockApi.mockImplementation(routeApi());
+    mockConfirm.mockReset();
+    mockConfirm.mockResolvedValue(true);
 
     vi.stubGlobal("requestAnimationFrame", (callback) => {
       callback();
@@ -56,7 +109,7 @@ describe("Halls Admin Page", () => {
   });
 
   it("should display the loading state initially", () => {
-    mockApi.mockReturnValue(new Promise(() => {}));
+    mockApi.mockImplementation(() => new Promise(() => {}));
 
     renderHalls();
 
@@ -98,8 +151,10 @@ describe("Halls Admin Page", () => {
 
     await waitForHalls();
 
+    // The footer is a single text node that also lists current showtimes,
+    // so match the part we care about instead of the whole string.
     expect(
-      screen.getByText("Total capacity: 100 seats across 2 halls")
+      screen.getByText(/Total capacity: 100 seats across 2 halls/)
     ).toBeInTheDocument();
   });
 
@@ -112,7 +167,7 @@ describe("Halls Admin Page", () => {
   });
 
   it("should display an empty state when no halls exist", async () => {
-    mockApi.mockResolvedValue([]);
+    mockApi.mockImplementation(routeApi({ "GET /halls": Promise.resolve([]) }));
 
     renderHalls();
 
@@ -124,7 +179,9 @@ describe("Halls Admin Page", () => {
   });
 
   it("should display an error when halls cannot be loaded", async () => {
-    mockApi.mockRejectedValue(new Error("Unable to load halls."));
+    mockApi.mockImplementation(
+      routeApi({ "GET /halls": Promise.reject(new Error("Unable to load halls.")) })
+    );
 
     renderHalls();
 
@@ -174,7 +231,7 @@ describe("Halls Admin Page", () => {
       "Please enter a hall name."
     );
 
-    expect(mockApi).toHaveBeenCalledTimes(1);
+    expect(mutationCalls()).toHaveLength(0);
   });
 
   it("should reject invalid seating dimensions", async () => {
@@ -198,7 +255,7 @@ describe("Halls Admin Page", () => {
       "Rows and seats per row must be whole numbers of at least 1."
     );
 
-    expect(mockApi).toHaveBeenCalledTimes(1);
+    expect(mutationCalls()).toHaveLength(0);
   });
 
   it("should reject an invalid cleaning time", async () => {
@@ -222,7 +279,7 @@ describe("Halls Admin Page", () => {
       "Cleaning time must be a whole number of 0 minutes or more."
     );
 
-    expect(mockApi).toHaveBeenCalledTimes(1);
+    expect(mutationCalls()).toHaveLength(0);
   });
 
   it("should create a new hall successfully", async () => {
@@ -370,13 +427,11 @@ describe("Halls Admin Page", () => {
   });
 
   it("should display an error when saving a hall fails", async () => {
-    mockApi.mockImplementation((url, options) => {
-      if (options?.method === "POST") {
-        return Promise.reject(new Error("Unable to save the hall."));
-      }
-
-      return Promise.resolve(halls);
-    });
+    mockApi.mockImplementation(
+      routeApi({
+        "POST /halls": () => Promise.reject(new Error("Unable to save the hall.")),
+      })
+    );
 
     renderHalls();
 
@@ -394,7 +449,7 @@ describe("Halls Admin Page", () => {
   });
 
   it("should delete a hall after confirmation", async () => {
-    vi.stubGlobal("confirm", vi.fn(() => true));
+    mockConfirm.mockResolvedValue(true);
 
     renderHalls();
 
@@ -408,8 +463,11 @@ describe("Halls Admin Page", () => {
       });
     });
 
-    expect(confirm).toHaveBeenCalledWith(
-      'Delete "Hall 1"? This cannot be undone.'
+    expect(mockConfirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Delete this hall?",
+        message: expect.stringContaining('"Hall 1"'),
+      })
     );
 
     expect(await screen.findByRole("status")).toHaveTextContent(
@@ -418,7 +476,7 @@ describe("Halls Admin Page", () => {
   });
 
   it("should not delete a hall when confirmation is cancelled", async () => {
-    vi.stubGlobal("confirm", vi.fn(() => false));
+    mockConfirm.mockResolvedValue(false);
 
     renderHalls();
 
@@ -426,20 +484,23 @@ describe("Halls Admin Page", () => {
 
     fireEvent.click(screen.getAllByRole("button", { name: "Delete" })[0]);
 
-    expect(confirm).toHaveBeenCalled();
-    expect(mockApi).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockConfirm).toHaveBeenCalled());
+
+    // Let the (declined) confirmation promise settle before asserting
+    await Promise.resolve();
+
+    expect(mutationCalls()).toHaveLength(0);
   });
 
   it("should display an error when deleting a hall fails", async () => {
-    vi.stubGlobal("confirm", vi.fn(() => true));
+    mockConfirm.mockResolvedValue(true);
 
-    mockApi.mockImplementation((url, options) => {
-      if (options?.method === "DELETE") {
-        return Promise.reject(new Error("Unable to delete the hall."));
-      }
-
-      return Promise.resolve(halls);
-    });
+    mockApi.mockImplementation(
+      routeApi({
+        "DELETE /halls/hall1": () =>
+          Promise.reject(new Error("Unable to delete the hall.")),
+      })
+    );
 
     renderHalls();
 
