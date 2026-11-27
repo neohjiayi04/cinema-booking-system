@@ -10,6 +10,5 @@ export default defineConfig({
     css: false, //Disables CSS imports in tests
     clearMocks: true, //Clears mock history between tests
     testTimeout: 15000, //Gives slow tests (e.g. userEvent typing) more time when the machine is busy
-    reporters: ["./reporters/jestStyleReporter.js"] //Pretty reporter for better test output
   }
 });

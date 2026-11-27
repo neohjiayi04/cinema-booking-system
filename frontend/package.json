@@ -8,7 +8,10 @@
     "build": "vite build",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:unit": "vitest run src/components/SeatMap.unit.test.jsx src/components/SeatPicker/seatMath.unit.test.js src/services/api.unit.test.js",
+    "test:verbose": "vitest run --reporter=verbose",
+    "test:jest-style": "vitest run --reporter=./src/test/reporters/jestStyleReporter.js"
   },
   "dependencies": {
     "@react-three/fiber": "^9.8.2",
