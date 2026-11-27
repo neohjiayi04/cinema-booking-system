@@ -8,7 +8,10 @@
     "dev": "node --watch src/server.js",
     "seed": "node src/seed.js",
     "lint": "eslint .",
-    "test": "node --test"
+    "test": "node --test --test-reporter=spec tests/*.test.js",
+    "test:unit": "node --test --test-reporter=spec tests/*.unit.test.js",
+    "test:integration": "node --test --test-reporter=spec tests/integration.test.js",
+    "test:clean": "node --test --test-reporter=./reporter/jestStyleReporter.mjs tests/*.test.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
