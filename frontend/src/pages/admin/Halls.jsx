@@ -14,6 +14,12 @@ const EMPTY_FORM = {
 
 const HALL_STATUSES = ["ACTIVE", "MAINTENANCE", "INACTIVE"];
 
+// Same limits as the backend (validateHall): seats are lettered A-Z, so at most
+// 26 rows; cleaning time is 0-30 minutes. The backend stays the final authority.
+const MAX_ROWS = 26;
+const MAX_SEATS_PER_ROW = 50;
+const MAX_CLEANING_MINUTES = 30;
+
 // Halls are required. Showtimes + movies only feed the "current showtimes"
 // column, so if they fail to load the page still works (count shows None).
 function fetchAll() {
@@ -129,11 +135,23 @@ export default function Halls() {
       return;
     }
 
+    if (payload.rows > MAX_ROWS || payload.seatsPerRow > MAX_SEATS_PER_ROW) {
+      setError(
+        `A hall can have at most ${MAX_ROWS} rows and ${MAX_SEATS_PER_ROW} seats per row.`
+      );
+      return;
+    }
+
     if (
       !Number.isInteger(payload.cleaningMinutes) ||
       payload.cleaningMinutes < 0
     ) {
       setError("Cleaning time must be a whole number of 0 minutes or more.");
+      return;
+    }
+
+    if (payload.cleaningMinutes > MAX_CLEANING_MINUTES) {
+      setError(`Cleaning time cannot be more than ${MAX_CLEANING_MINUTES} minutes.`);
       return;
     }
 
@@ -369,7 +387,7 @@ export default function Halls() {
                   className="admin-input"
                   type="number"
                   min="1"
-                  max="50"
+                  max={MAX_ROWS}
                   placeholder="Rows"
                   value={form.rows}
                   onChange={setField("rows")}
@@ -387,7 +405,7 @@ export default function Halls() {
                   className="admin-input"
                   type="number"
                   min="1"
-                  max="50"
+                  max={MAX_SEATS_PER_ROW}
                   placeholder="Seats per row"
                   value={form.seatsPerRow}
                   onChange={setField("seatsPerRow")}
@@ -409,7 +427,7 @@ export default function Halls() {
                     className="admin-input"
                     type="number"
                     min="0"
-                    max="180"
+                    max={MAX_CLEANING_MINUTES}
                     placeholder="20"
                     value={form.cleaningMinutes}
                     onChange={setField("cleaningMinutes")}

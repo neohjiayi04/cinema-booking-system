@@ -329,6 +329,61 @@ describe("Halls Admin Page", () => {
     expect(screen.getByLabelText("Hall name")).toHaveValue("");
   });
 
+  it("REGRESSION: a 30-minute cleaning time is saved and shown straight after creating a hall", async () => {
+    // Stateful fake backend: POST stores exactly what it receives and the
+    // following GET /halls returns it, like the real API + database.
+    const store = [...halls];
+
+    mockApi.mockImplementation((url, options) => {
+      if (url === "/halls" && options?.method === "POST") {
+        const body = JSON.parse(options.body);
+        store.push({ _id: "hall-new", ...body });
+        return Promise.resolve(store[store.length - 1]);
+      }
+      if (url === "/halls") return Promise.resolve([...store]);
+      if (url === "/showtimes" || url === "/movies") return Promise.resolve([]);
+      return Promise.resolve({});
+    });
+
+    renderHalls();
+    await waitForHalls();
+
+    fireEvent.change(screen.getByLabelText("Hall name"), {
+      target: { value: "Hall 30" },
+    });
+    fireEvent.change(screen.getByLabelText("Cleaning time (minutes)"), {
+      target: { value: "30" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "+ Add Hall" }));
+
+    const row = (await screen.findByText("Hall 30")).closest("tr");
+    expect(row).toHaveTextContent("30 min");
+    expect(row).not.toHaveTextContent("20 min");
+
+    expect(JSON.parse(mockApi.mock.calls.find(([, o]) => o?.method === "POST")[1].body))
+      .toMatchObject({ cleaningMinutes: 30 });
+  });
+
+  it("should reject a cleaning time above the 30-minute limit", async () => {
+    renderHalls();
+    await waitForHalls();
+
+    fireEvent.change(screen.getByLabelText("Hall name"), {
+      target: { value: "Hall 4" },
+    });
+    fireEvent.change(screen.getByLabelText("Cleaning time (minutes)"), {
+      target: { value: "45" },
+    });
+    fireEvent.submit(
+      screen.getByRole("button", { name: "+ Add Hall" }).closest("form")
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Cleaning time cannot be more than 30 minutes."
+    );
+    expect(mutationCalls()).toHaveLength(0);
+  });
+
   it("should use the default cleaning time and status when creating a hall", async () => {
     renderHalls();
 
