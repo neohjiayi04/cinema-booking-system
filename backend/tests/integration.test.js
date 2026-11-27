@@ -1558,3 +1558,253 @@ test("archiveExpiredMovies should archive long-ended movies only", async () => {
   assert.equal((await movies.findOne({ _id: recentlyEnded.movie._id })).archived, false);
   assert.equal((await movies.findOne({ _id: restored.movie._id })).archived, false);
 });
+// ==================================================
+// AUDIT REGRESSION TESTS
+// ==================================================
+
+const asAdmin = req => req.set("Authorization", `Bearer ${adminToken}`);
+
+async function createHallViaApi(fields = {}) {
+  return asAdmin(request(app).post("/api/halls")).send({
+    name: `Audit Hall ${new ObjectId()}`.slice(0, 40),
+    rows: 3,
+    seatsPerRow: 4,
+    ...fields
+  });
+}
+
+// Inserts a long-running movie so showtimes can be created for any future date.
+async function createWideMovie(duration = 120) {
+  const today = todayString();
+  const { movie } = await createMovieWithShowtime({
+    releaseDate: addDays(today, -1),
+    endDate: addDays(today, 90),
+    duration
+  });
+  await getDb().collection("showtimes").deleteMany({ movieId: movie._id });
+  return movie;
+}
+
+function postShowtime(movie, hall, date, startTime) {
+  return asAdmin(request(app).post("/api/showtimes")).send({
+    movieId: movie._id.toString(),
+    hallId: String(hall._id),
+    date,
+    startTime,
+    price: 15
+  });
+}
+
+test("REGRESSION: POST /api/halls keeps a custom cleaning time of 30", async () => {
+  const created = await createHallViaApi({ cleaningMinutes: 30 }).then(r => {
+    assert.equal(r.status, 201);
+    return r.body;
+  });
+
+  // Response, database and a fresh list all agree (survives a "refresh").
+  assert.equal(created.cleaningMinutes, 30);
+  const stored = await getDb().collection("halls").findOne({ _id: new ObjectId(created._id) });
+  assert.equal(stored.cleaningMinutes, 30);
+
+  const list = await request(app).get("/api/halls").expect(200);
+  assert.equal(list.body.find(h => h._id === created._id).cleaningMinutes, 30);
+});
+
+test("REGRESSION: POST /api/halls accepts 0 minutes and string input", async () => {
+  const zero = await createHallViaApi({ cleaningMinutes: 0 });
+  assert.equal(zero.status, 201);
+  assert.equal(zero.body.cleaningMinutes, 0);
+
+  const text = await createHallViaApi({ cleaningMinutes: "25" });
+  assert.equal(text.status, 201);
+  assert.equal(text.body.cleaningMinutes, 25);
+});
+
+test("POST /api/halls defaults to 20 minutes only when none is supplied", async () => {
+  const response = await createHallViaApi();
+  assert.equal(response.status, 201);
+  assert.equal(response.body.cleaningMinutes, 20);
+
+  const stored = await getDb().collection("halls").findOne({ _id: new ObjectId(response.body._id) });
+  assert.equal(stored.cleaningMinutes, 20);
+  assert.equal(stored.status, "ACTIVE");
+});
+
+test("POST /api/halls rejects an invalid cleaning time", async () => {
+  for (const cleaningMinutes of [-1, 31, 1.5, "abc"]) {
+    const response = await createHallViaApi({ cleaningMinutes });
+    assert.equal(response.status, 400, `cleaningMinutes=${cleaningMinutes}`);
+  }
+});
+
+test("PUT /api/halls/:id updates and persists the cleaning time", async () => {
+  const hall = (await createHallViaApi({ cleaningMinutes: 10 })).body;
+
+  const updated = await asAdmin(request(app).put(`/api/halls/${hall._id}`))
+    .send({ cleaningMinutes: 30 })
+    .expect(200);
+  assert.equal(updated.body.cleaningMinutes, 30);
+
+  const list = await request(app).get("/api/halls").expect(200);
+  assert.equal(list.body.find(h => h._id === hall._id).cleaningMinutes, 30);
+});
+
+test("Showtime conflicts use the hall's own cleaning time", async () => {
+  const movie = await createWideMovie(120);
+  const date = addDays(todayString(), 20);
+
+  const shortCleaning = (await createHallViaApi({ cleaningMinutes: 0 })).body;
+  await postShowtime(movie, shortCleaning, date, "10:00").expect(201); // ends 12:00
+  await postShowtime(movie, shortCleaning, date, "12:00").expect(201); // 0 min gap is fine
+
+  const longCleaning = (await createHallViaApi({ cleaningMinutes: 30 })).body;
+  await postShowtime(movie, longCleaning, date, "10:00").expect(201); // free at 12:30
+  const clash = await postShowtime(movie, longCleaning, date, "12:20").expect(409);
+  assert.equal(clash.body.code, "SHOWTIME_CONFLICT");
+  assert.match(clash.body.message, /12:30/);
+  await postShowtime(movie, longCleaning, date, "12:30").expect(201);
+});
+
+test("Different halls may run showings at the same time", async () => {
+  const movie = await createWideMovie(120);
+  const date = addDays(todayString(), 21);
+  const hallA = (await createHallViaApi()).body;
+  const hallB = (await createHallViaApi()).body;
+
+  await postShowtime(movie, hallA, date, "15:00").expect(201);
+  await postShowtime(movie, hallB, date, "15:00").expect(201);
+  await postShowtime(movie, hallA, date, "15:00").expect(409);
+});
+
+test("A late showing that runs past midnight blocks an early showing next day", async () => {
+  const movie = await createWideMovie(120);
+  const date = addDays(todayString(), 22);
+  const hall = (await createHallViaApi({ cleaningMinutes: 20 })).body;
+
+  await postShowtime(movie, hall, date, "23:00").expect(201); // ends 01:00, free 01:20
+  await postShowtime(movie, hall, addDays(date, 1), "00:30").expect(409);
+  await postShowtime(movie, hall, addDays(date, 1), "01:20").expect(201);
+});
+
+test("Malformed ids return 400 instead of 500", async () => {
+  await request(app).get("/api/movies/not-an-id").expect(400);
+  await request(app).get("/api/showtimes?movieId=nope").expect(400);
+  await request(app)
+    .get("/api/bookings/not-an-id")
+    .set("Authorization", `Bearer ${customerToken}`)
+    .expect(400);
+  await request(app)
+    .post("/api/bookings")
+    .set("Authorization", `Bearer ${customerToken}`)
+    .send({ showtimeId: "nope", seats: ["A01"] })
+    .expect(400);
+  await asAdmin(request(app).put("/api/movies/not-an-id")).send({}).expect(400);
+});
+
+test("GET /api/bookings/:id includes the movie, showtime and hall for the ticket", async () => {
+  const movie = await createWideMovie(100);
+  const hall = (await createHallViaApi()).body;
+  const date = addDays(todayString(), 23);
+  const created = await postShowtime(movie, hall, date, "18:00").expect(201);
+
+  const booking = await request(app)
+    .post("/api/bookings")
+    .set("Authorization", `Bearer ${customerToken}`)
+    .send({ showtimeId: created.body._id, seats: ["A01"] })
+    .expect(201);
+
+  const detail = await request(app)
+    .get(`/api/bookings/${booking.body._id}`)
+    .set("Authorization", `Bearer ${customerToken}`)
+    .expect(200);
+
+  assert.equal(detail.body.movie.title, movie.title);
+  assert.equal(detail.body.hall.name, hall.name);
+  assert.equal(detail.body.showtime.startTime, "18:00");
+  assert.deepEqual(detail.body.seats, ["A01"]);
+});
+
+test("CONCURRENCY: simultaneous requests for one seat produce exactly one booking", async () => {
+  const movie = await createWideMovie(100);
+  const hall = (await createHallViaApi()).body;
+  const date = addDays(todayString(), 24);
+  const created = await postShowtime(movie, hall, date, "20:00").expect(201);
+  const showtime = created.body._id;
+
+  const attempt = token =>
+    request(app)
+      .post("/api/bookings")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ showtimeId: showtime, seats: ["B02"] });
+
+  const tokens = [customerToken, secondCustomerToken];
+  const responses = await Promise.all(
+    Array.from({ length: 12 }, (_, i) => attempt(tokens[i % 2]))
+  );
+
+  const statuses = responses.map(r => r.status);
+  assert.equal(statuses.filter(s => s === 201).length, 1, `statuses: ${statuses}`);
+  assert.equal(statuses.filter(s => s === 409).length, 11, `statuses: ${statuses}`);
+
+  const stored = await getDb().collection("bookings")
+    .countDocuments({ showtimeId: new ObjectId(showtime), status: "CONFIRMED", seats: "B02" });
+  assert.equal(stored, 1);
+});
+
+test("CONCURRENCY: overlapping multi-seat requests never double-book a seat", async () => {
+  const movie = await createWideMovie(100);
+  const hall = (await createHallViaApi()).body;
+  const date = addDays(todayString(), 25);
+  const created = await postShowtime(movie, hall, date, "21:00").expect(201);
+  const showtime = created.body._id;
+
+  const book = (token, seats) =>
+    request(app)
+      .post("/api/bookings")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ showtimeId: showtime, seats });
+
+  const responses = await Promise.all([
+    book(customerToken, ["A01", "A02"]),
+    book(secondCustomerToken, ["A02", "A03"]),
+    book(customerToken, ["A03", "A04"]),
+    book(secondCustomerToken, ["A04", "A01"])
+  ]);
+
+  const confirmed = await getDb().collection("bookings")
+    .find({ showtimeId: new ObjectId(showtime), status: "CONFIRMED" }).toArray();
+  const seats = confirmed.flatMap(b => b.seats);
+  assert.equal(new Set(seats).size, seats.length, "a seat was booked twice");
+  assert.equal(confirmed.length, responses.filter(r => r.status === 201).length);
+  assert.ok(responses.every(r => [201, 409].includes(r.status)));
+});
+
+test("A cancelled booking releases its seat for another customer", async () => {
+  const movie = await createWideMovie(100);
+  const hall = (await createHallViaApi()).body;
+  const date = addDays(todayString(), 26);
+  const created = await postShowtime(movie, hall, date, "17:00").expect(201);
+
+  const first = await request(app)
+    .post("/api/bookings")
+    .set("Authorization", `Bearer ${customerToken}`)
+    .send({ showtimeId: created.body._id, seats: ["C01"] })
+    .expect(201);
+
+  await request(app)
+    .post("/api/bookings")
+    .set("Authorization", `Bearer ${secondCustomerToken}`)
+    .send({ showtimeId: created.body._id, seats: ["C01"] })
+    .expect(409);
+
+  await request(app)
+    .delete(`/api/bookings/${first.body._id}`)
+    .set("Authorization", `Bearer ${customerToken}`)
+    .expect(200);
+
+  await request(app)
+    .post("/api/bookings")
+    .set("Authorization", `Bearer ${secondCustomerToken}`)
+    .send({ showtimeId: created.body._id, seats: ["C01"] })
+    .expect(201);
+});

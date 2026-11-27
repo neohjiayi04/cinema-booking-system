@@ -1,12 +1,13 @@
 import express from "express";
 import cors from "cors";
 import http from "http";
+import { randomInt } from "crypto";
 import { WebSocketServer } from "ws";
 import { ObjectId } from "mongodb";
 import { getDb } from "./db.js";
 import {  hashPassword, verifyPassword, createToken, requireAuth, requireAdmin} from "./auth.js";
 import {MOVIE_STATUS, decorateMovie, getMovieStatus, bookingBlockedMessage,normalizeTitle,releaseYear,validateMovie,pickMovieFields,showtimeDateProblem,todayString} from "./utils/movieUtils.js";
-import {HALL_STATUS,decorateHall,hallStatus,isValidTime,isValidDate,isShowtimePast,isShowtimeUpcoming,findShowtimeConflict,conflictMessage,pickHallFields,validateHall} from "./utils/showtimeUtils.js";
+import {HALL_STATUS,decorateHall,hallStatus,hallCleaningMinutes,isValidTime,isValidDate,isShowtimePast,isShowtimeUpcoming,findShowtimeConflict,conflictMessage,pickHallFields,validateHall,neighbouringDates} from "./utils/showtimeUtils.js";
 import { generateValidSeats } from "./utils/seatUtils.js";
 
 const app = express();
@@ -51,9 +52,15 @@ async function getBookedSeatsForHall(hallId) {
   return [...new Set(bookings.flatMap(item => item.seats || []))];
 }
 
-async function findShowtimeHallConflict(candidate, excludeId = null) {
+// Looks for a clash in the same hall. The hall's own cleaning time is used, and the
+// day before/after is searched too so a late-night showing that runs past midnight
+// is still compared with an early showing on the next day.
+async function findShowtimeHallConflict(candidate, hall, excludeId = null) {
   const db = getDb();
-  const filter = { hallId: candidate.hallId, date: candidate.date };
+  const filter = {
+    hallId: candidate.hallId,
+    date: { $in: neighbouringDates(candidate.date) }
+  };
   if (excludeId) filter._id = { $ne: excludeId };
 
   const rows = await db.collection("showtimes").aggregate([
@@ -78,8 +85,9 @@ async function findShowtimeHallConflict(candidate, excludeId = null) {
     }
   ]).toArray();
 
-  const cleaningMinutes = 20;
-  return findShowtimeConflict(candidate, rows, cleaningMinutes);
+  const cleaningMinutes = hallCleaningMinutes(hall);
+  const conflict = findShowtimeConflict(candidate, rows, cleaningMinutes);
+  return conflict ? { conflict, cleaningMinutes } : null;
 }
 
 function validateShowtimeInput({ date, startTime, price }) {
@@ -301,6 +309,8 @@ app.get("/api/admin/movies", requireAuth, requireAdmin, async (_req, res) => {
 });
 
 app.get("/api/movies/:id", async (req, res) => {
+  if (!isObjectId(req.params.id)) return badId(res, "movie");
+
   const movie = await getDb().collection("movies")
     .findOne({ _id: id(req.params.id) });
 
@@ -354,6 +364,8 @@ app.post("/api/movies", requireAuth, requireAdmin, async (req, res) => {
 });
 
 app.put("/api/movies/:id", requireAuth, requireAdmin, async (req, res) => {
+  if (!isObjectId(req.params.id)) return badId(res, "movie");
+
   const movies = getDb().collection("movies");
   const movieId = id(req.params.id);
 
@@ -412,6 +424,8 @@ app.put("/api/movies/:id", requireAuth, requireAdmin, async (req, res) => {
 
 // Archive instead of delete: hides the movie from customers and blocks booking.
 app.put("/api/movies/:id/archive", requireAuth, requireAdmin, async (req, res) => {
+  if (!isObjectId(req.params.id)) return badId(res, "movie");
+
   const movies = getDb().collection("movies");
   const movieId = id(req.params.id);
 
@@ -450,6 +464,8 @@ app.put("/api/movies/:id/archive", requireAuth, requireAdmin, async (req, res) =
 // Un-archive. The movie returns to Coming Soon / Now Showing / Ended based on its dates.
 // restoredAt stops the automatic archiver from archiving it again straight away.
 app.put("/api/movies/:id/restore", requireAuth, requireAdmin, async (req, res) => {
+  if (!isObjectId(req.params.id)) return badId(res, "movie");
+
   const result = await getDb().collection("movies").findOneAndUpdate(
     { _id: id(req.params.id) },
     {
@@ -465,6 +481,8 @@ app.put("/api/movies/:id/restore", requireAuth, requireAdmin, async (req, res) =
 });
 
 app.delete("/api/movies/:id", requireAuth, requireAdmin, async (req, res) => {
+  if (!isObjectId(req.params.id)) return badId(res, "movie");
+
   const movies = getDb().collection("movies");
   const movieId = id(req.params.id);
 
@@ -498,17 +516,21 @@ app.get("/api/halls", async (_req, res) => {
 });
 
 app.post("/api/halls", requireAuth, requireAdmin, async (req, res) => {
-  const input = {
-    name: String(req.body.name ?? "").trim(),
-    rows: Number(req.body.rows),
-    seatsPerRow: Number(req.body.seatsPerRow),
-    status: String(req.body.status ?? HALL_STATUS.ACTIVE).toUpperCase()
-  };
+  // pickHallFields keeps cleaningMinutes (the old inline copy silently dropped it,
+  // so every new hall fell back to the default).
+  const input = pickHallFields(req.body);
+  input.name ??= "";
+  input.status ??= HALL_STATUS.ACTIVE;
 
   const problem = validateHall(input);
   if (problem) return res.status(400).json({ message: problem });
 
-  const hall = { ...input, createdAt: new Date() };
+  // 20 (config default) is only used when no cleaning time was supplied.
+  const hall = {
+    ...input,
+    cleaningMinutes: hallCleaningMinutes(input),
+    createdAt: new Date()
+  };
   const result = await getDb().collection("halls").insertOne(hall);
   hall._id = result.insertedId;
 
@@ -617,6 +639,8 @@ app.delete("/api/halls/:id", requireAuth, requireAdmin, async (req, res) => {
 
 // ---------------- SHOWTIMES ----------------
 app.get("/api/showtimes", async (req, res) => {
+  if (req.query.movieId && !isObjectId(req.query.movieId)) return badId(res, "movie");
+
   const filter = req.query.movieId
     ? { movieId: id(req.query.movieId) }
     : {};
@@ -751,10 +775,10 @@ app.post("/api/showtimes", requireAuth, requireAdmin, async (req, res) => {
     return res.status(400).json({ message: "Showtime must start in the future." });
   }
 
-  const conflict = await findShowtimeHallConflict(candidate);
-  if (conflict) {
+  const clash = await findShowtimeHallConflict(candidate, hall);
+  if (clash) {
     return res.status(409).json({
-      message: conflictMessage(hall, conflict, 20),
+      message: conflictMessage(hall, clash.conflict, clash.cleaningMinutes),
       code: "SHOWTIME_CONFLICT"
     });
   }
@@ -824,9 +848,12 @@ app.put("/api/showtimes/:id", requireAuth, requireAdmin, async (req, res) => {
   const candidate = {
     movieId, hallId, date, startTime, duration: Number(movie.duration), title: movie.title
   };
-  const conflict = await findShowtimeHallConflict(candidate, showtimeId);
-  if (conflict) {
-    return res.status(409).json({ message: conflictMessage(hall, conflict, 20), code: "SHOWTIME_CONFLICT" });
+  const clash = await findShowtimeHallConflict(candidate, hall, showtimeId);
+  if (clash) {
+    return res.status(409).json({
+      message: conflictMessage(hall, clash.conflict, clash.cleaningMinutes),
+      code: "SHOWTIME_CONFLICT"
+    });
   }
 
   const update = { movieId, hallId, date, startTime, price: Number(price) };
@@ -947,7 +974,7 @@ function generateReference() {
   const d = new Date();
   const stamp = d.toISOString().replace(/\D/g, "").slice(0, 14);
 
-  return `BK-${stamp}-${Math.floor(100 + Math.random() * 900)}`;
+  return `BK-${stamp}-${randomInt(100, 1000)}`;
 }
 
 // Create booking
@@ -960,6 +987,8 @@ app.post("/api/bookings", requireAuth, async (req, res) => {
         message: "Showtime and at least one seat are required"
       });
     }
+
+    if (!isObjectId(showtimeId)) return badId(res, "showtime");
 
     const normalizedSeats = seats.map(seat => String(seat).trim().toUpperCase());
     if (normalizedSeats.some(seat => !seat)) {
@@ -1085,10 +1114,19 @@ app.post("/api/bookings", requireAuth, async (req, res) => {
   }
 });
 
-// Get booking by ID
+// Get booking by ID (with its showtime, movie and hall so the ticket can show them)
 app.get("/api/bookings/:id", requireAuth, async (req, res) => {
-  const booking = await getDb().collection("bookings")
-    .findOne({ _id: id(req.params.id) });
+  if (!isObjectId(req.params.id)) return badId(res, "booking");
+
+  const [booking] = await getDb().collection("bookings").aggregate([
+    { $match: { _id: id(req.params.id) } },
+    { $lookup: { from: "showtimes", localField: "showtimeId", foreignField: "_id", as: "showtime" } },
+    { $unwind: { path: "$showtime", preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: "movies", localField: "showtime.movieId", foreignField: "_id", as: "movie" } },
+    { $unwind: { path: "$movie", preserveNullAndEmptyArrays: true } },
+    { $lookup: { from: "halls", localField: "showtime.hallId", foreignField: "_id", as: "hall" } },
+    { $unwind: { path: "$hall", preserveNullAndEmptyArrays: true } }
+  ]).toArray();
 
   if (!booking) {
     return res.status(404).json({ message: "Booking not found" });
@@ -1107,6 +1145,7 @@ app.get("/api/bookings/:id", requireAuth, async (req, res) => {
 // ---------------- UPDATE BOOKING SEATS ----------------
 app.put("/api/bookings/:id", requireAuth, async (req, res) => {
   try {
+    if (!isObjectId(req.params.id)) return badId(res, "booking");
     const bookingId = id(req.params.id);
     const userId = id(req.user.id);
     const { seats } = req.body;
@@ -1286,6 +1325,13 @@ app.put("/api/bookings/:id", requireAuth, async (req, res) => {
 
     res.json(updatedBooking);
   } catch (error) {
+    // Another customer took one of the seats between our check and our update.
+    if (error?.code === 11000) {
+      return res.status(409).json({
+        message: "One or more of those seats have just been booked by another customer. Please refresh the seat map."
+      });
+    }
+
     console.error("Update booking error:", error);
     res.status(500).json({
       message: "Failed to update booking seats."
@@ -1296,6 +1342,7 @@ app.put("/api/bookings/:id", requireAuth, async (req, res) => {
 // ---------------- CANCEL BOOKING ----------------
 app.delete("/api/bookings/:id", requireAuth, async (req, res) => {
   try {
+    if (!isObjectId(req.params.id)) return badId(res, "booking");
     const bookingId = id(req.params.id);
     const userId = id(req.user.id);
     const bookings = getDb().collection("bookings");

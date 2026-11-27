@@ -26,6 +26,14 @@ export function toMinutes(date, time) {
   return Date.parse(`${day(date)}T${time}:00Z`) / 60000;
 }
 
+/** The day before, the day itself and the day after (YYYY-MM-DD each). */
+export function neighbouringDates(date) {
+  const base = Date.parse(`${day(date)}T00:00:00Z`);
+  return [-1, 0, 1].map(offset =>
+    new Date(base + offset * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+  );
+}
+
 /** HH:MM for a value from toMinutes(). */
 export function formatMinutes(total) {
   return new Date(total * 60000).toISOString().slice(11, 16);
