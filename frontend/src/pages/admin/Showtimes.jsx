@@ -3,7 +3,7 @@ import { api } from "../../services/api.js";
 import { MOVIE_STATUS } from "../../constants/movieOptions.js";
 import PopupHost, { useConfirm } from "../../components/Popup.jsx";
 import ActionButton from "../../components/ActionButton.jsx";
-import { getShowtimeStatus } from "../../constants/showtimeStatus.js";
+import { getShowtimeStatus, SHOWTIME_STATUS } from "../../constants/showtimeStatus.js";
 
 const initialForm = {
   movieId: "",
@@ -105,6 +105,14 @@ function formatTime(time) {
   });
 }
 
+// Tabs for the list. "Ongoing" = the showing is playing right now.
+const STATUS_TABS = [
+  { key: "ALL", label: "All", empty: "No showtimes found." },
+  { key: "UPCOMING", label: "Upcoming", empty: "No upcoming showtimes found." },
+  { key: "NOW_SHOWING", label: "Ongoing", empty: "No ongoing showtimes right now." },
+  { key: "ENDED", label: "Completed", empty: "No completed showtimes found." },
+];
+
 function hallStatusLabel(status) {
   switch (status) {
     case HALL_STATUS.MAINTENANCE:
@@ -131,6 +139,7 @@ export default function Showtimes() {
 
   // "Now", refreshed every minute so statuses update while the page is open
   const [now, setNow] = useState(() => Date.now());
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -442,6 +451,29 @@ export default function Showtimes() {
     startMinutes !== null &&
     calculatedEndTime &&
     timeToMinutes(calculatedEndTime) <= startMinutes;
+
+  // Business state of every showtime (Upcoming / Ongoing / Completed), computed
+  // from its start time and the movie duration - never stored.
+  const statusOf = (showtime) => {
+    const movie =
+      showtime.movie ||
+      movies.find((item) => item._id === showtime.movieId);
+
+    return getShowtimeStatus(showtime, Number(movie?.duration), now);
+  };
+
+  const statusCounts = { ALL: showtimes.length, UPCOMING: 0, NOW_SHOWING: 0, ENDED: 0 };
+  for (const showtime of showtimes) {
+    const key = statusOf(showtime);
+    if (key in statusCounts) statusCounts[key] += 1;
+  }
+
+  const visibleShowtimes =
+    statusFilter === "ALL"
+      ? showtimes
+      : showtimes.filter((showtime) => statusOf(showtime) === statusFilter);
+
+  const activeTab = STATUS_TABS.find((tab) => tab.key === statusFilter) || STATUS_TABS[0];
 
   const selectableMovies = movies.filter(
     (movie) =>
@@ -845,6 +877,24 @@ export default function Showtimes() {
           </div>
         </div>
 
+        {!loading && showtimes.length > 0 && (
+          <div className="admin-filter-tabs" role="tablist" aria-label="Filter showtimes by status">
+            {STATUS_TABS.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={statusFilter === tab.key}
+                className={`admin-filter-tab${statusFilter === tab.key ? " is-active" : ""}`}
+                onClick={() => setStatusFilter(tab.key)}
+              >
+                {tab.label}
+                <span className="admin-filter-count">{statusCounts[tab.key]}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {loading ? (
           <div className="admin-empty-state">
             <p>Loading showtimes...</p>
@@ -874,6 +924,7 @@ export default function Showtimes() {
                     <th>Date</th>
                     <th>Time</th>
                     <th>Hall</th>
+                    <th>Status</th>
                     <th>Price</th>
                     <th>Bookings</th>
                     <th>Actions</th>
@@ -881,7 +932,15 @@ export default function Showtimes() {
                 </thead>
 
                 <tbody>
-                  {showtimes.map((showtime) => {
+                  {visibleShowtimes.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="admin-empty-row">
+                        {activeTab.empty}
+                      </td>
+                    </tr>
+                  )}
+
+                  {visibleShowtimes.map((showtime) => {
                     const movie =
                       showtime.movie ||
                       movies.find(
@@ -971,6 +1030,16 @@ export default function Showtimes() {
                         </td>
 
                         <td>
+                          <span
+                            className={`admin-status ${
+                              (SHOWTIME_STATUS[statusKey] || SHOWTIME_STATUS.UNKNOWN).className
+                            }`}
+                          >
+                            {(SHOWTIME_STATUS[statusKey] || SHOWTIME_STATUS.UNKNOWN).label}
+                          </span>
+                        </td>
+
+                        <td>
                           RM{" "}
                           {Number(
                             showtime.price
@@ -997,7 +1066,7 @@ export default function Showtimes() {
                           <div className="app-act-group">
                             <ActionButton
                               variant="edit"
-                              icon={locked ? "lock" : "trash"}
+                              icon={locked ? "lock" : "edit"}
                               onClick={() => startEdit(showtime)}
                               disabled={locked}
                             >
@@ -1024,7 +1093,7 @@ export default function Showtimes() {
 
             <div className="admin-table-footer">
               <span>
-                Total showtimes: {showtimes.length} · {totalBookings}{" "}
+                Showing {visibleShowtimes.length} of {showtimes.length} showtimes · {totalBookings}{" "}
                 {totalBookings === 1 ? "booking" : "bookings"}
               </span>
             </div>

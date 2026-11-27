@@ -3309,3 +3309,56 @@ body:has(.admin-layout) {
   background: #fff1f2;
   color: #b91c1c;
 }
+/* Status filter tabs (Showtimes) */
+.admin-filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 24px 16px;
+}
+
+.admin-filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--admin-text-secondary);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+.admin-filter-tab:hover {
+  background: var(--admin-surface-hover);
+}
+
+.admin-filter-tab.is-active {
+  color: #fff;
+  background: var(--admin-accent);
+  border-color: var(--admin-accent);
+}
+
+.admin-filter-count {
+  min-width: 20px;
+  padding: 0 6px;
+  font-size: 0.75rem;
+  line-height: 20px;
+  text-align: center;
+  border-radius: 999px;
+  background: rgba(127, 140, 190, 0.18);
+}
+
+.admin-filter-tab.is-active .admin-filter-count {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.admin-empty-row {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--admin-text-secondary);
+}
