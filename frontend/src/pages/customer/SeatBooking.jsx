@@ -53,8 +53,6 @@ export default function SeatBooking() {
     loadInitialShowtime();
 
     socket = connectShowtime(id, (message) => {
-      console.log("WebSocket message received:", message);
-
       if (
         message.type === "CONNECTED" ||
         message.type === "JOINED_SHOWTIME"
@@ -74,15 +72,20 @@ export default function SeatBooking() {
         );
       }
 
+      // A customer edited their booking: some seats were released, some newly taken.
       if (message.type === "SEATS_UPDATED") {
-        const seats = message.seats || [];
+        const released = message.releasedSeats || [];
+        const taken = message.bookedSeats || [];
 
         setBookedSeats((prev) => [
-          ...new Set([...prev, ...seats]),
+          ...new Set([
+            ...prev.filter((seat) => !released.includes(seat)),
+            ...taken,
+          ]),
         ]);
 
         setSelectedSeats((prev) =>
-          prev.filter((seat) => !seats.includes(seat))
+          prev.filter((seat) => !taken.includes(seat))
         );
       }
 
@@ -93,6 +96,16 @@ export default function SeatBooking() {
           prev.filter((seat) => !seats.includes(seat))
         );
       }
+    }, {
+      onDisconnect: () => setConnected(false),
+      // Events sent while offline were missed: reload the real seat map.
+      onReconnect: () => {
+        fetchShowtime()
+          .then((data) => {
+            if (!cancelled) applyShowtimeData(data);
+          })
+          .catch(() => {});
+      },
     });
 
     return () => {
