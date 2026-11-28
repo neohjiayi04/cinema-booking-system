@@ -348,18 +348,22 @@ export default function AdminDashboard() {
         />
       </div>
 
-      {/* Movie Performance */}
+      {/* Movie Performance (Top 3 Podium) */}
       <section className="admin-panel movie-performance-panel">
         <div className="admin-panel-header">
           <div>
-            <h2 className="admin-section-title">
-              Movie Performance
-            </h2>
-
+            <h2 className="admin-section-title">Top Performing Movies</h2>
             <p className="admin-panel-subtitle">
-              Compare ticket sales and revenue across your movie catalogue.
+              Best-selling titles ranked by tickets sold and confirmed revenue.
             </p>
           </div>
+
+          <Link
+            to="/admin/movies"
+            className="admin-btn admin-btn-secondary admin-btn-sm"
+          >
+            All Movies →
+          </Link>
         </div>
 
         {loading ? (
@@ -370,92 +374,63 @@ export default function AdminDashboard() {
         ) : rankedMovies.length === 0 ? (
           <div className="admin-empty-state">
             <h3>No movies available</h3>
-            <p>
-              Add movies to your catalogue to view their performance.
-            </p>
+            <p>Add movies to your catalogue to view their performance.</p>
           </div>
         ) : (
-          <>
-            {/* Best Performing Movie */}
-            {bestPerformingMovie ? (
-              <div className="best-movie-card">
-                <div
-                  className="best-movie-icon"
-                  aria-hidden="true"
+          <div className="top-movies-grid">
+            {rankedMovies.slice(0, 3).map((movie, index) => {
+              const rank = index + 1;
+              const hasSales = movie.ticketsSold > 0;
+              const revenueShare =
+                totalConfirmedRevenue > 0
+                  ? Math.round((movie.revenue / totalConfirmedRevenue) * 100)
+                  : 0;
+
+              return (
+                <article
+                  key={movie.id}
+                  className={`top-movie-card top-movie-card--${rank}`}
                 >
-                  ★
-                </div>
+                  <div className="top-movie-card-top">
+                    <span className={`movie-rank movie-rank--${rank}`}>
+                      {hasSales ? `#${rank}` : "—"}
+                    </span>
 
-                <div className="best-movie-information">
-                  <span className="best-movie-label">
-                    TOP PERFORMING MOVIE
-                  </span>
+                    <span className="top-movie-share">
+                      {revenueShare}% of revenue
+                    </span>
+                  </div>
 
-                  <h3>{bestPerformingMovie.title}</h3>
+                  <h3 className="top-movie-title" title={movie.title}>
+                    {movie.title}
+                  </h3>
 
-                  <p>
-                    {bestPerformingMovie.ticketsSold.toLocaleString()} tickets sold
-                    <span> · </span>
-                    {formatMoney(bestPerformingMovie.revenue)} revenue
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="best-movie-empty">
-                No confirmed ticket sales yet. Movie rankings will appear
-                here once customers make bookings.
-              </div>
-            )}
+                  <div className="top-movie-revenue">
+                    {formatMoney(movie.revenue)}
+                  </div>
 
-            {/* Movie Performance Table */}
-            <div className="admin-table-wrapper">
-              <table className="admin-table movie-performance-table">
-                <thead>
-                  <tr>
-                    <th>Movie</th>
-                    <th>Confirmed Bookings</th>
-                    <th>Tickets Sold</th>
-                    <th>Cancelled</th>
-                    <th>Revenue</th>
-                  </tr>
-                </thead>
+                  <div className="top-movie-bar" aria-hidden="true">
+                    <span style={{ width: `${Math.max(revenueShare, hasSales ? 8 : 0)}%` }} />
+                  </div>
 
-                <tbody>
-                  {rankedMovies.map((movie, index) => (
-                    <tr key={movie.id}>
-                      <td className="admin-cell-primary">
-                        <div className="movie-performance-title">
-                          {index === 0 && movie.ticketsSold > 0 && (
-                            <span className="movie-rank">
-                              #1
-                            </span>
-                          )}
-
-                          {movie.title}
-                        </div>
-                      </td>
-
-                      <td>{movie.confirmedBookings}</td>
-
-                      <td>
-                        <strong>
-                          {movie.ticketsSold.toLocaleString()}
-                        </strong>
-                      </td>
-
-                      <td>{movie.cancelledBookings}</td>
-
-                      <td>
-                        <strong>
-                          {formatMoney(movie.revenue)}
-                        </strong>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+                  <div className="top-movie-metrics">
+                    <div>
+                      <span>Tickets</span>
+                      <strong>{movie.ticketsSold.toLocaleString()}</strong>
+                    </div>
+                    <div>
+                      <span>Confirmed</span>
+                      <strong>{movie.confirmedBookings}</strong>
+                    </div>
+                    <div>
+                      <span>Cancelled</span>
+                      <strong>{movie.cancelledBookings}</strong>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
         )}
       </section>
 
