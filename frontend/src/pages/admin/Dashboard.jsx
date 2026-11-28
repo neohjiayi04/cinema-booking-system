@@ -263,10 +263,6 @@ export default function AdminDashboard() {
     0
   );
 
-  const bestPerformingMovie = rankedMovies.find(
-    (movie) => movie.ticketsSold > 0
-  );
-
   return (
     <>
       {/* Dashboard Header */}
